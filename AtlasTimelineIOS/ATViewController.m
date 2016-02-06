@@ -76,8 +76,8 @@
 
 #define HAVE_IMAGE_INDICATOR 100
 
-#define AD_Y_POSITION_IPAD 60
-#define AD_Y_POSITION_PHONE 40
+#define AD_Y_POSITION_IPAD 160
+#define AD_Y_POSITION_PHONE 140
 
 #define PHOTO_META_FILE_NAME @"MetaFileForOrderAndDesc"
 
@@ -141,7 +141,7 @@
     NSMutableArray* animationCameras;
     
     BOOL firstTimeShowFlag;
-    
+    NSString* prevSelectedEventId;
     NSString* languageToSelect;
     UIBarButtonItem *settringButton;
     
@@ -801,11 +801,15 @@
     else
     {
         // use the zoom level to compute the region
+        if ([ent.uniqueId isEqualToString:prevSelectedEventId]) //if select same event, them zoom in one step for better user experience
+            zoomLevel++;
         MKCoordinateSpan span = [self coordinateSpanWithMapView:self.mapView centerCoordinate:centerCoordinate andZoomLevel:zoomLevel];
         MKCoordinateRegion region = MKCoordinateRegionMake(centerCoordinate, span);
         
         // set the region like normal
         [self.mapView setRegion:region animated:YES];
+        
+        prevSelectedEventId = ent.uniqueId;
     }
 }
 
@@ -1042,6 +1046,10 @@
 {
     int timeWindowY = self.view.bounds.size.height - [ATConstants timeScrollWindowHeight];
     int timeLineY = timeWindowY;
+    [UIView beginAnimations:@"showBanner" context:nil];
+    self.iAdBannerView.frame = CGRectMake(self.iAdBannerView.frame.origin.x, self.iAdBannerView.frame.origin.y, GAD_SIZE_320x50.width, GAD_SIZE_320x50.height);
+    self.gAdBannerView.frame = CGRectMake(self.gAdBannerView.frame.origin.x, self.gAdBannerView.frame.origin.y, GAD_SIZE_320x50.width, GAD_SIZE_320x50.height);
+    [UIView commitAnimations];
     [UIView animateWithDuration:0.3
                           delay:0.0
                         options:UIViewAnimationCurveEaseOut
@@ -1061,6 +1069,10 @@
 {
     int timeWindowY = self.view.bounds.size.height - [ATConstants timeScrollWindowHeight];
     int timeLineY = timeWindowY;
+    [UIView beginAnimations:@"showBanner" context:nil];
+    self.iAdBannerView.frame = CGRectMake(self.iAdBannerView.frame.origin.x, self.iAdBannerView.frame.origin.y, 0, 0);
+    self.gAdBannerView.frame = CGRectMake(self.gAdBannerView.frame.origin.x, self.gAdBannerView.frame.origin.y, 0, 0);
+    [UIView commitAnimations];
     [UIView animateWithDuration:0.3
                           delay:0.0
                         options:UIViewAnimationCurveEaseOut
@@ -1088,6 +1100,10 @@
     int hideX = -190;
     if (UI_USER_INTERFACE_IDIOM() == UIUserInterfaceIdiomPhone)
         hideX = -110;
+    [UIView beginAnimations:@"showBanner" context:nil];
+    self.iAdBannerView.frame = CGRectMake(self.iAdBannerView.frame.origin.x, self.iAdBannerView.frame.origin.y, GAD_SIZE_320x50.width, GAD_SIZE_320x50.height);
+    self.gAdBannerView.frame = CGRectMake(self.gAdBannerView.frame.origin.x, self.gAdBannerView.frame.origin.y, GAD_SIZE_320x50.width, GAD_SIZE_320x50.height);
+    [UIView commitAnimations];
     [UIView animateWithDuration:0.4
                           delay:0.0
                         options:UIViewAnimationCurveEaseOut
@@ -1116,6 +1132,10 @@
 {
     int timeWindowY = self.view.bounds.size.height - [ATConstants timeScrollWindowHeight];
     int timeLineY = timeWindowY;
+    [UIView beginAnimations:@"showBanner" context:nil];
+    self.iAdBannerView.frame = CGRectMake(self.iAdBannerView.frame.origin.x, self.iAdBannerView.frame.origin.y, 0,0);
+    self.gAdBannerView.frame = CGRectMake(self.gAdBannerView.frame.origin.x, self.gAdBannerView.frame.origin.y, 0,0);
+    [UIView commitAnimations];
     [UIView animateWithDuration:0.3
                           delay:0.0
                         options:UIViewAnimationCurveEaseOut
@@ -1544,7 +1564,6 @@ NSLog(@"--new-- %d, %@, %@", cnt,cluster.cluster.title, identifier);
                 //[tmpLbl setAutoresizesSubviews:true];
                 [tmpLbl addSubview: imgView];
                 tmpLbl.layer.cornerRadius = 8;
-                tmpLbl.layer.borderColor = [UIColor brownColor].CGColor;
                 tmpLbl.layer.borderWidth = 1;
             }
             else
@@ -1555,7 +1574,6 @@ NSLog(@"--new-- %d, %@, %@", cnt,cluster.cluster.title, identifier);
                 tmpLbl.backgroundColor = [UIColor colorWithRed:255.0 green:255 blue:0.8 alpha:0.8];
                 tmpLbl.text = [NSString stringWithFormat:@" %@", [ATHelper clearMakerAllFromDescText: annotation.description ]];
                 tmpLbl.layer.cornerRadius = 8;
-                tmpLbl.layer.borderColor = [UIColor redColor].CGColor;
                 tmpLbl.layer.borderWidth = 1;
             }
         }
@@ -1567,9 +1585,9 @@ NSLog(@"--new-- %d, %@, %@", cnt,cluster.cluster.title, identifier);
             //If the event has photo before but the photos do not exist anymore, then show text with red board
             //If this happen, the photo may in Dropbox. if not  in dropbox, then it lost forever.
             //To change color, add a photo and delete it, then it will change to brown border
-            tmpLbl.layer.borderColor = [UIColor brownColor].CGColor;
             tmpLbl.layer.borderWidth = 1;
         }
+        tmpLbl.layer.borderColor = [UIColor lightGrayColor].CGColor;
         
         tmpLbl.userInteractionEnabled = YES;
         [tmpLblUniqueIdMap setObject:annView forKey:[NSNumber numberWithInt:tmpLblUniqueMapIdx ]];
@@ -1772,6 +1790,16 @@ NSLog(@"--new-- %d, %@, %@", cnt,cluster.cluster.title, identifier);
     for (id key in annotationToShowImageSet) {
         NSArray *splitArray = [key componentsSeparatedByString:@"|"];
         UILabel* tmpLbl = [annotationToShowImageSet objectForKey:key];
+        if ([key isEqualToString:focuseKey])
+        {
+            tmpLbl.backgroundColor = [UIColor colorWithRed:1.0 green:0.7 blue:0.7 alpha:0.4];
+            tmpLbl.layer.borderColor = [UIColor redColor].CGColor;
+        }
+        else
+        {
+            tmpLbl.backgroundColor = [UIColor colorWithRed:255.0 green:255 blue:0.8 alpha:0.8];
+            tmpLbl.layer.borderColor = [UIColor lightGrayColor].CGColor;
+        }
         CLLocationCoordinate2D coordinate;
         coordinate.latitude=[splitArray[0] doubleValue];
         coordinate.longitude = [splitArray[1] doubleValue];
@@ -1967,8 +1995,8 @@ NSLog(@"--new-- %d, %@, %@", cnt,cluster.cluster.title, identifier);
 
 - (void) refreshFocusedEvent
 {
-    if (selectedEventAnnOnMap == nil || switchEventListViewModeToVisibleOnMapFlag)
-        return; //do not focuse when popup event editor in map event list mode for two reason:
+    //if (selectedEventAnnOnMap == nil || switchEventListViewModeToVisibleOnMapFlag)
+    //    return; //do not focuse when popup event editor in map event list mode for two reason:
     // 1. conceptually it is not neccessary   2. there is a small but if do so
     //MKMapView* mapView = self.mapView;
     MKAnnotationView* view = selectedEventAnnOnMap;
@@ -2534,6 +2562,13 @@ NSLog(@"--new-- %d, %@, %@", cnt,cluster.cluster.title, identifier);
     [self displayTimelineControls];
     [self calculateSearchBarFrame]; //in iPhone, make search bar wider in landscape
     [self closeTutorialView];
+    CGRect frame = self.iAdBannerView.frame;
+    frame.origin.y = [ATConstants screenHeight] - GAD_SIZE_320x50.height;
+    self.iAdBannerView.frame = frame;
+    
+    frame = self.gAdBannerView.frame;
+    frame.origin.y = [ATConstants screenHeight] - GAD_SIZE_320x50.height;
+    self.gAdBannerView.frame = frame;
 }
 
 -(void)searchBarSearchButtonClicked:(UISearchBar *)theSearchBar
@@ -3010,15 +3045,14 @@ NSLog(@"--new-- %d, %@, %@", cnt,cluster.cluster.title, identifier);
 }
 -(void)initiAdBanner
 {
-    return;
     NSString* targetName = [[[NSBundle mainBundle] infoDictionary] objectForKey:@"CFBundleName"];
     if ([targetName hasPrefix:@"Cnet"])
         return;
     if (!self.iAdBannerView)
     {
-        CGRect rect = CGRectMake(0, AD_Y_POSITION_IPAD, GAD_SIZE_320x50.width, GAD_SIZE_320x50.height);
+        CGRect rect = CGRectMake(40, [ATConstants screenHeight] - GAD_SIZE_320x50.height, GAD_SIZE_320x50.width, GAD_SIZE_320x50.height);
         if (UI_USER_INTERFACE_IDIOM() == UIUserInterfaceIdiomPhone)
-            rect = CGRectMake(0, AD_Y_POSITION_PHONE, GAD_SIZE_320x50.width, GAD_SIZE_320x50.height);
+            rect = CGRectMake(0, [ATConstants screenHeight] - GAD_SIZE_320x50.height, GAD_SIZE_320x50.width, GAD_SIZE_320x50.height);
         self.iAdBannerView = [[ADBannerView alloc]initWithFrame:rect];
         self.iAdBannerView.delegate = self;
         self.iAdBannerView.hidden = TRUE;
@@ -3033,9 +3067,9 @@ NSLog(@"--new-- %d, %@, %@", cnt,cluster.cluster.title, identifier);
         return;
     if (!self.gAdBannerView)
     {
-        CGRect rect = CGRectMake(0, 60, GAD_SIZE_320x50.width, GAD_SIZE_320x50.height);
+        CGRect rect = CGRectMake([ATConstants timeScrollWindowX], [ATConstants screenHeight] - GAD_SIZE_320x50.height, GAD_SIZE_320x50.width, GAD_SIZE_320x50.height);
         if (UI_USER_INTERFACE_IDIOM() == UIUserInterfaceIdiomPhone)
-            rect = CGRectMake(0, AD_Y_POSITION_PHONE, GAD_SIZE_320x50.width, GAD_SIZE_320x50.height);
+            rect = CGRectMake([ATConstants timeScrollWindowX], [ATConstants screenHeight] - GAD_SIZE_320x50.height, GAD_SIZE_320x50.width, GAD_SIZE_320x50.height);
         self.gAdBannerView = [[GADBannerView alloc] initWithFrame:rect];
         self.gAdBannerView.adUnitID = @"ca-app-pub-5383516122867647/8499480217";
         self.gAdBannerView.rootViewController = self;
@@ -3049,9 +3083,9 @@ NSLog(@"--new-- %d, %@, %@", cnt,cluster.cluster.title, identifier);
 {
     if (banner && ![banner isHidden])
     {
-        [UIView beginAnimations:@"hideBanner" context:nil];
-        banner.frame = CGRectOffset(banner.frame, 0, banner.frame.size.height - 60);
-        [UIView commitAnimations];
+        //[UIView beginAnimations:@"hideBanner" context:nil];
+        //banner.frame = CGRectOffset(banner.frame, 0, banner.frame.size.height - 60);
+        //[UIView commitAnimations];
         banner.hidden = TRUE;
     }
 }
@@ -3059,9 +3093,9 @@ NSLog(@"--new-- %d, %@, %@", cnt,cluster.cluster.title, identifier);
 {
     if (banner && [banner isHidden])
     {
-        [UIView beginAnimations:@"showBanner" context:nil];
-        banner.frame = CGRectOffset(banner.frame, 0, -banner.frame.size.height + 60);
-        [UIView commitAnimations];
+        //[UIView beginAnimations:@"showBanner" context:nil];
+        //banner.frame = CGRectOffset(banner.frame, 0, -banner.frame.size.height + 60);
+        //[UIView commitAnimations];
         banner.hidden = FALSE;
     }
 }

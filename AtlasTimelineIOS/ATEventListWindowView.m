@@ -182,13 +182,15 @@ NSDateFormatter *dateFormatter;
     ATEventDataStruct* focusedEvent = appDelegate.focusedEvent;
     if (focusedEvent != nil && [focusedEvent.uniqueId isEqual:evt.uniqueId])
     {
-        [cell.checkIcon setHidden:false];
+        [cell.checkIcon setHidden:true];
         cell.backgroundColor = [UIColor colorWithRed:1.0 green:0.0 blue:0.0 alpha:0.40];
+        [cell.layer setBorderColor:[UIColor redColor].CGColor];
     }
     else
     {
         [cell.checkIcon setHidden:true];
         cell.backgroundColor = [UIColor clearColor];
+        [cell.layer setBorderColor:[UIColor lightGrayColor].CGColor];
     }
         
     if (evt.eventType == EVENT_TYPE_HAS_PHOTO && isAtLeast7) //excusionPaths is available only after 7
@@ -274,7 +276,7 @@ NSDateFormatter *dateFormatter;
     else{ //Above: Do not change focused event for up/down arrow cause (map mode has no arrow
         appDelegate.focusedDate = evt.eventDate;
         appDelegate.focusedEvent = evt;  //appDelegate.focusedEvent is added when implement here
-        int zoomLeve = -1;
+        int zoomLeve = [mapView zoomLevel];
         if ([mapView zoomLevel] < 5)
             zoomLeve = 5;
         [mapView setNewFocusedDateAndUpdateMapWithNewCenter : evt :zoomLeve]; //do not change map zoom level

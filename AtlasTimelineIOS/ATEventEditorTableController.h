@@ -59,7 +59,7 @@
 
 - (void)changeDateInLabel:(id)sender;
 - (void)datePicked:(id)sender;
-- (void)createPhotoScrollView:(ATEventAnnotation*) ann;
+- (void)createPhotoScrollView:(NSString*) photoDirName eventDesc:(NSString*)descText;
 - (void)showPhotoView:(NSInteger)photoFileName image:(UIImage*)image;
 - (void)deleteCallback:(NSString*) photoFileName;
 - (void)resetEventEditor;

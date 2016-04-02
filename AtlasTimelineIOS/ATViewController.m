@@ -165,6 +165,7 @@
     switchEventListViewModeToVisibleOnMapFlag = false; //eventListView for timewheel is more reasonable, so make it as default always, even not save to userDefault
     
     [ATHelper createPhotoDocumentoryPath];
+    [ATHelper createWebCachePhotoDocumentoryPath];
     //ATAppDelegate *appDelegate = (ATAppDelegate *)[[UIApplication sharedApplication] delegate];
     self.locationManager = [[CLLocationManager alloc] init];
     //add for ios8
@@ -1544,6 +1545,13 @@ NSLog(@"--new-- %d, %@, %@", cnt,cluster.cluster.title, identifier);
             if ([targetName hasPrefix:@"WorldHeritage"])
                 photoFileName = [ATHelper getPhotoNameFromDescForWorldHeritage:annotation.description];
             UIImage* img = [ATHelper readPhotoThumbFromFile:photoFileName];
+            if (img == nil)
+            {
+                NSArray* thumbFileUrlList = [ATHelper getPhotoUrlsFromDescText:annotation.description];
+                if (thumbFileUrlList != nil && [thumbFileUrlList count] > 0)
+                    img = [ATHelper fetchAndCachePhotoFromWeb:thumbFileUrlList[0] thumbPhotoId:photoFileName];
+                
+            }
             if (img != nil)
             {
                 UIImageView* imgView = [[UIImageView alloc]initWithImage: img];
@@ -2131,7 +2139,7 @@ NSLog(@"--new-- %d, %@, %@", cnt,cluster.cluster.title, identifier);
     
     [ATEventEditorTableController setEventId:ann.uniqueId];
     //if (ann.eventType == EVENT_TYPE_HAS_PHOTO)
-    [self.eventEditor createPhotoScrollView: ann ];
+    [self.eventEditor createPhotoScrollView: ann.uniqueId eventDesc:ann.description ];
     [self showOverlays]; //added in Reader version
 }
 

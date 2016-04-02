@@ -200,7 +200,14 @@ NSDateFormatter *dateFormatter;
         NSString* targetName = [[[NSBundle mainBundle] infoDictionary] objectForKey:@"CFBundleName"];
         if ([targetName hasPrefix:@"WorldHeritage"])
             photoFileName = [ATHelper getPhotoNameFromDescForWorldHeritage:evt.eventDesc];
-        cell.photoImage.image = [ATHelper readPhotoThumbFromFile:photoFileName];
+        UIImage* img = [ATHelper readPhotoThumbFromFile:photoFileName];
+        if (img == nil)
+        {
+            NSArray* thumbFileUrlList = [ATHelper getPhotoUrlsFromDescText:evt.eventDesc];
+            if (thumbFileUrlList != nil && [thumbFileUrlList count] > 0)
+                img = [ATHelper fetchAndCachePhotoFromWeb:thumbFileUrlList[0] thumbPhotoId:evt.uniqueId];
+        }
+        cell.photoImage.image = img;
         
         UIBezierPath * imgRect = [UIBezierPath bezierPathWithRect:imageFrame];
         cell.eventDescView.textContainer.exclusionPaths = @[imgRect];

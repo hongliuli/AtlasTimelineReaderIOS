@@ -36,7 +36,11 @@
 + (NSString*) getSelectedDbFileName;
 + (void) setSelectedDbFileName:(NSString*)fileName;
 + (void) createPhotoDocumentoryPath;
++ (void) createWebCachePhotoDocumentoryPath;
 + (NSString*) getRootDocumentoryPath;
++ (NSString*)getPreloadedPhotoBundlePath; //previously named getBundlePath()
++ (NSString*)getWebCachePhotoDocummentoryPath;
++ (NSString*)convertWebUrlToFullPhotoPath:(NSString*)webPhotoUrl;
 + (NSString*)getRootBundlePath;
 + (NSString*)getPhotoDocummentoryPath;
 + (NSString*)getNewUnsavedEventPhotoPath;
@@ -44,6 +48,7 @@
 
 //photo related
 + (UIImage*)imageResizeWithImage:(UIImage*)image scaledToSize:(CGSize)newSize;
++ (UIImage*)fetchAndCachePhotoFromWeb:(NSString*)photoUrl thumbPhotoId:(NSString*)thumbPhotoId;
 + (UIImage*)readPhotoFromFile:(NSString*)photoFileName eventId:photoDir;
 + (UIImage*)readPhotoThumbFromFile:(NSString*)eventId;
 +(void)writePhotoToFileFromWeb:(NSString*)eventId newAddedList:(NSArray*)newAddedList newDescList:(NSArray*)newDescList;
@@ -54,6 +59,7 @@
 //misc
 + (UIColor *) colorWithHexString: (NSString *) stringToConvert;
 + (NSString*) getMarkerNameFromDescText: (NSString*)descTxt;
++ (NSArray*) getPhotoUrlsFromDescText: (NSString*)descTxt;
 + (NSString*) clearMakerFromDescText: (NSString*)desc :(NSString*)markerName;
 + (NSString*) clearMakerAllFromDescText: (NSString*)desc;
 + (NSArray*) getEventListWithUniqueIds: (NSArray*)uniqueIds;

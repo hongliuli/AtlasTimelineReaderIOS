@@ -80,6 +80,9 @@ int editorPhotoViewHeight;
 
 
 NSMutableDictionary *photoFilesMetaMap;
+NSString* descriptionWithMetadata;
+NSTimer* _timerRefreshWebPhoto;
+int assumeNoMoreWebPhotoToDownloadCount;
 
 #pragma mark UITableViewDelegate
 /*
@@ -269,10 +272,15 @@ forRowAtIndexPath: (NSIndexPath*)indexPath
     lblShareCount.text = [NSString stringWithFormat:NSLocalizedString(@"%d photo(s)",nil), self.photoScrollView.selectedAsShareIndexSet.count ];
 }
  
-//called by mapView after know eventId
-- (void) createPhotoScrollView:(ATEventAnnotation *)ann
+//called by mapView after know eventId. descText contains photo url from web, so need to pass in
+- (void) createPhotoScrollView:(NSString *)photoDirName  eventDesc:(NSString*)descText
 {
-    NSString* photoDirName = ann.uniqueId;
+    if (_timerRefreshWebPhoto != nil)
+    {
+        [_timerRefreshWebPhoto invalidate];
+        _timerRefreshWebPhoto = nil; //have to do this every time start a eventeditor, make sure a new timer will be instanced
+    }
+    descriptionWithMetadata = descText;
     self.photoDescChangedFlag = false;
     self.photoScrollView = [[ATPhotoScrollView alloc] initWithFrame:CGRectMake(0,5,editorPhotoViewWidth,editorPhotoViewHeight)];
     self.photoScrollView.tag = ADDED_PHOTOSCROLL_TAG_900;
@@ -289,7 +297,7 @@ forRowAtIndexPath: (NSIndexPath*)indexPath
         NSString* targetName = [[[NSBundle mainBundle] infoDictionary] objectForKey:@"CFBundleName"];
         if ([targetName hasPrefix:@"WorldHeritage"])
         {
-            NSString* whId = [ATHelper getPhotoNameFromDescForWorldHeritage:ann.description];
+            NSString* whId = [ATHelper getPhotoNameFromDescForWorldHeritage:descText];
             [self.photoScrollView.photoList addObject:whId];
             _photoList = self.photoScrollView.photoList;
             return;
@@ -299,16 +307,52 @@ forRowAtIndexPath: (NSIndexPath*)indexPath
         if(error != nil) {
             NSLog(@"Error in reading files: %@", [error localizedDescription]);
             self.isFirstTimeAddPhoto = true;
-            return;
+            tmpFileList = [[NSArray alloc] init];
         }
         if ([tmpFileList count] == 0)
             self.isFirstTimeAddPhoto = true;
         else
             self.isFirstTimeAddPhoto = false;
         
+        NSArray* webPhotoList = [ATHelper getPhotoUrlsFromDescText:descText];
+        BOOL hasUncachedWebPhoto = false;
+        for (NSString* webPhototUrl in webPhotoList)
+        {
+            NSString* fullWebPhotoPath = [ATHelper convertWebUrlToFullPhotoPath:webPhototUrl];
+            
+            if ([[NSFileManager defaultManager] fileExistsAtPath:fullWebPhotoPath isDirectory:nil])
+            {
+                self.isFirstTimeAddPhoto = false;
+                tmpFileList = [tmpFileList arrayByAddingObject:fullWebPhotoPath];
+            }
+            else
+            {
+                [ATHelper fetchAndCachePhotoFromWeb:webPhototUrl thumbPhotoId:nil]; //TODO if webPhotoUrl has no photo, this will be called evvery time start eventeidito for this event, but nothing we can do
+                hasUncachedWebPhoto = true;
+            }
+        }
         self.photoScrollView.photoList = [NSMutableArray arrayWithArray:tmpFileList];
+        
+        if (hasUncachedWebPhoto)
+        {
+            assumeNoMoreWebPhotoToDownloadCount = 0;
+            if (_timerRefreshWebPhoto == nil)
+            {
+                _timerRefreshWebPhoto = [NSTimer scheduledTimerWithTimeInterval:2.0
+                                                                         target:self
+                                                                       selector:@selector(refreshPhotoListViewWithTimer:)
+                                                                       userInfo:nil
+                                                                        repeats:YES];
+                [_timerRefreshWebPhoto fire];
+            }
+            else
+            {
+                [_timerRefreshWebPhoto fire];
+            }
+        }
+        
         //Sort photo list. The sort will be saved to dropbox as a file together with photo description
-        NSString *photoMetaFilePath = [[[ATHelper getPhotoDocummentoryPath] stringByAppendingPathComponent:ann.uniqueId] stringByAppendingPathComponent:PHOTO_META_FILE_NAME];
+        NSString *photoMetaFilePath = [[[ATHelper getPhotoDocummentoryPath] stringByAppendingPathComponent:photoDirName] stringByAppendingPathComponent:PHOTO_META_FILE_NAME];
         
         //photoFileMetaMap will be nil if no file ???
         photoFilesMetaMap = [NSMutableDictionary dictionaryWithContentsOfFile:photoMetaFilePath];
@@ -350,6 +394,41 @@ forRowAtIndexPath: (NSIndexPath*)indexPath
         [customViewForPhoto bringSubviewToFront:addPhotoBtn];
         [self updatePhotoCountLabel];
     } //else it will process in viewForSectionHeader
+}
+
+- (void) refreshPhotoListViewWithTimer:(NSTimer*)_timer
+{
+    //NSLog(@"----- refresh photo list view timer fired");
+    assumeNoMoreWebPhotoToDownloadCount ++;
+    NSArray* webPhotoList = [ATHelper getPhotoUrlsFromDescText:descriptionWithMetadata];
+    BOOL hasNewDownloadedPhoto = false;
+    for (NSString* webPhototUrl in webPhotoList)
+    {
+        NSString* fullWebPhotoPath = [ATHelper convertWebUrlToFullPhotoPath:webPhototUrl];
+        
+        if ([[NSFileManager defaultManager] fileExistsAtPath:fullWebPhotoPath isDirectory:nil])
+        {
+            if (![self.photoScrollView.photoList containsObject:fullWebPhotoPath])
+            {
+                hasNewDownloadedPhoto = true;
+                self.isFirstTimeAddPhoto = false;
+                assumeNoMoreWebPhotoToDownloadCount = 0;
+                [self.photoScrollView.photoList addObject:fullWebPhotoPath];
+            }
+        }
+    }
+    if (hasNewDownloadedPhoto)
+    {
+        [self.photoScrollView.horizontalTableView reloadData];
+    }
+    else
+    { //a not so-perfect assume: if no photo downloaded in 3 seconds for 3 times, then assume no more photo to download, so invalidate timer
+        if (assumeNoMoreWebPhotoToDownloadCount >= 999) //may not neccessary to have it here, because I am going to disable timer when view didDisappear
+        {
+            [_timerRefreshWebPhoto invalidate];
+            _timerRefreshWebPhoto = nil;
+        }
+    }
 }
 
 - (CGFloat)tableView:(UITableView *)tableView heightForRowAtIndexPath:(NSIndexPath *)indexPath
@@ -564,10 +643,12 @@ forRowAtIndexPath: (NSIndexPath*)indexPath
 
     ent.eventType = self.eventType;
     //see doneSelectPicture() which will set if there is a picture
-    if ([self.photoScrollView.photoList count] > 0 || [photoNewAddedList count] > 0) //1 means has photo so mapView will show thumbnail
-        ent.eventType = 1;
+    if ([self.photoScrollView.photoList count] > 0
+        || [photoNewAddedList count] > 0
+        || [ATHelper getPhotoUrlsFromDescText:ent.eventDesc] != nil) //means has photo so mapView will show thumbnail
+        ent.eventType = EVENT_TYPE_HAS_PHOTO;
     else
-        ent.eventType = 0;
+        ent.eventType = EVENT_TYPE_NO_PHOTO;
     
     
     NSArray* finalFullSortedList = self.photoScrollView.photoSortedListFromMetaFile;

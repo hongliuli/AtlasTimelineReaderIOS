@@ -31,7 +31,9 @@
 NSDateFormatter* dateFormaterForMonth;
 NSDateFormatter* dateLiterFormat;
 NSCalendar* calendar;
-
+NSMutableArray* webPhotoDownloadQueue;
+NSTimer* _timerProcessWebPhotoDownloadQueye;
+static int maxConcurrentDownload;
 
 UIPopoverController *verifyViewPopover;
 + (NSString *)applicationDocumentsDirectory {
@@ -273,6 +275,23 @@ UIPopoverController *verifyViewPopover;
     if (error != nil)
         NSLog(@"Error in createPhotoDocumentoryPath=%@, Error= %@", [ATHelper getNewUnsavedEventPhotoPath],[error localizedDescription]);
 }
+//call when app start and switch download source. call everytime startup is ok even the path already exists
++ (void) createWebCachePhotoDocumentoryPath
+{
+    NSString* documentsDirectory = [self getWebCachePhotoDocummentoryPath];
+    NSError *error;
+    [[NSFileManager defaultManager] createDirectoryAtPath:documentsDirectory withIntermediateDirectories:YES attributes:nil error:&error];
+    if (error != nil)
+        NSLog(@"Error in createPhotoDocumentoryPath=%@, Error= %@", documentsDirectory,[error localizedDescription]);
+}
+
++ (NSString*)convertWebUrlToFullPhotoPath:(NSString*)photoUrl
+{
+    NSString* retStr = [photoUrl stringByReplacingOccurrencesOfString: @"/" withString:@"_"];
+    retStr = [retStr stringByReplacingOccurrencesOfString: @"%" withString:@"_"];
+    return [[ATHelper getWebCachePhotoDocummentoryPath] stringByAppendingPathComponent:retStr];
+}
+
 + (NSString*)getRootDocumentoryPath
 {
     NSArray *paths = NSSearchPathForDirectoriesInDomains(NSLibraryDirectory, NSUserDomainMask, YES);
@@ -303,6 +322,15 @@ UIPopoverController *verifyViewPopover;
         return [self getRootBundlePath];
 }
 
+//   http://www.iosmanual.com/tutorials/how-to-add-bundle-files-in-to-the-project-framework/
++ (NSString*)getPreloadedPhotoBundlePath
+{
+    NSString* targetName = [[[NSBundle mainBundle] infoDictionary] objectForKey:@"CFBundleName"];
+    //NSLog(@"------- mainBundle = %@, target=%@",[[NSBundle mainBundle] bundlePath],targetName);
+    NSString* photoDir = [NSString stringWithFormat:@"PhotosFor%@", targetName ];
+    return [[[NSBundle mainBundle] bundlePath] stringByAppendingPathComponent:photoDir];
+}
+
 + (NSString*)getNewUnsavedEventPhotoPath
 {
     return  [[[self getRootDocumentoryPath] stringByAppendingPathComponent:@"myEvents"] stringByAppendingPathComponent:@"newPhotosTmp"];
@@ -319,6 +347,174 @@ UIPopoverController *verifyViewPopover;
     return nil;
 }
 
++ (NSString*)getWebCachePhotoDocummentoryPath
+{
+    
+    NSArray *paths = NSSearchPathForDirectoriesInDomains(NSCachesDirectory, NSUserDomainMask, YES);
+    NSString *cachePath = [paths objectAtIndex:0];
+    BOOL isDir = NO;
+    NSError *error;
+    if (! [[NSFileManager defaultManager] fileExistsAtPath:cachePath isDirectory:&isDir] && isDir == NO) {
+        [[NSFileManager defaultManager] createDirectoryAtPath:cachePath withIntermediateDirectories:NO attributes:nil error:&error];
+    }
+    
+    return cachePath;
+}
+
+//#### thumbPhotoId is eventId, if its nil, means not for thumbnail
++(UIImage*)fetchAndCachePhotoFromWeb:(NSString*)photoUrl thumbPhotoId:(NSString*)thumbPhotoId
+{
+    if (photoUrl == nil || [photoUrl isEqualToString:@""])
+        return nil;
+    UIImage* localThumbImage = nil;
+    if (thumbPhotoId != nil)
+        localThumbImage = [ATHelper getThumbnailImageFromLocal:thumbPhotoId];
+    
+    
+    UIImage* returnImage = localThumbImage;
+    
+    NSString* fullWebPhotoPath = [ATHelper convertWebUrlToFullPhotoPath:photoUrl];
+    if (![[NSFileManager defaultManager] fileExistsAtPath:fullWebPhotoPath isDirectory:nil])
+    {
+        if (webPhotoDownloadQueue == nil)
+            webPhotoDownloadQueue = [[NSMutableArray alloc] init];
+        if (![webPhotoDownloadQueue containsObject:photoUrl])
+        {
+            [webPhotoDownloadQueue addObject:photoUrl];
+        }
+        
+        if (_timerProcessWebPhotoDownloadQueye == nil)
+        {   //this timer never expire once started, and only started once here
+            _timerProcessWebPhotoDownloadQueye = [NSTimer scheduledTimerWithTimeInterval:1.0
+                                                                                  target:self
+                                                                                selector:@selector(startCheckAndProcessDownloadQueue:)
+                                                                                userInfo:nil
+                                                                                 repeats:YES];
+            maxConcurrentDownload = 0;
+            [_timerProcessWebPhotoDownloadQueye fire];
+        }
+        //in case it became invalidated, fire it again (no place to invalidate it, but to be defensive programing here
+        if (![_timerProcessWebPhotoDownloadQueye isValid])
+        {
+            maxConcurrentDownload = 0;
+            [_timerProcessWebPhotoDownloadQueye fire];
+        }
+    }
+    else //has big file already
+    {
+        UIImage* img = [UIImage imageWithContentsOfFile:fullWebPhotoPath];
+        if (thumbPhotoId == nil)
+            returnImage = img;
+        else if (localThumbImage == nil)//has big file, but no thumbnail yet (this may happenif create an event with photo url and first enter event editor before tmpLbl/eventListView
+        {
+            NSData* imageData = [NSData dataWithContentsOfFile:fullWebPhotoPath];
+            [ATHelper writeWebThumbnail:imageData thumbnailName:thumbPhotoId];
+        }
+    }
+    return returnImage;
+}
+
+//once started, will keep on runing by check if there is to be downloaded in the queue
++ (void) startCheckAndProcessDownloadQueue:(NSTimer*)_timer
+{
+    //// Important to limit max concurrent download to small number, otherwise first run APP will generate too many threads
+    //// which make system slow initially
+    //if (maxConcurrentDownload < 10)
+    if (maxConcurrentDownload > 0)
+        return; //continues process queue after previous batch finish
+    
+    NSInteger queueLen = [webPhotoDownloadQueue count];
+    if (queueLen > 10)
+        queueLen = 10;
+    NSMutableArray* itemsToBeProcessedThisTime = [[NSMutableArray alloc] init];
+    for (int i = 0; i< queueLen; i++)
+    {
+        [itemsToBeProcessedThisTime addObject:webPhotoDownloadQueue[i]];
+    }
+    [webPhotoDownloadQueue removeObjectsInArray:itemsToBeProcessedThisTime];
+    for (int i = 0; i< queueLen; i++)
+    {
+        maxConcurrentDownload ++;
+        NSString* photoUrl = itemsToBeProcessedThisTime[i];
+        dispatch_async(dispatch_get_global_queue(DISPATCH_QUEUE_PRIORITY_DEFAULT, 0),
+                       ^{
+                           NSURL *imageURL = [NSURL URLWithString:photoUrl];
+                           NSData *imageData = [NSData dataWithContentsOfURL:imageURL];
+                           double len = [imageData length];
+                           maxConcurrentDownload --;
+                           if (imageData == nil || len < 50)
+                           {
+                               NSLog(@"      --- web return nil or < 50: %@", photoUrl);
+                               return;
+                           }
+                           
+                           NSLog(@"--- web return size is: %f for url: %@", len, photoUrl);
+                           //-----Save original file after resize if too big
+                           if (len > 500000) //if image data is 0.5M or more, resize it
+                           {
+                               UIImage * newPhoto = [[UIImage alloc] initWithData:imageData];
+                               int imageWidth = RESIZE_WIDTH;
+                               int imageHeight = RESIZE_HEIGHT;
+                               
+                               if (newPhoto.size.height > newPhoto.size.width)
+                               {
+                                   imageWidth = RESIZE_HEIGHT;
+                                   imageHeight = RESIZE_WIDTH;
+                               }
+                               UIImage *newImage = newPhoto;
+                               imageData = nil;
+                               if (newPhoto.size.height > imageHeight || newPhoto.size.width > imageWidth)
+                               {
+                                   newImage = [ATHelper imageResizeWithImage:newPhoto scaledToSize:CGSizeMake(imageWidth, imageHeight)];
+                               }
+                               //NSLog(@"widh=%f, height=%f",newPhoto.size.width, newPhoto.size.height);
+                               imageData = UIImageJPEGRepresentation(newImage, 1.0);
+                           }
+                           
+                           NSString* fullWebPhotoPath = [ATHelper convertWebUrlToFullPhotoPath:photoUrl];
+                           NSError* error;
+                           [imageData writeToFile:fullWebPhotoPath options:NSDataWritingAtomic error:&error];
+                           
+                       });
+    }
+}
+
++ (void) writeWebThumbnail:(NSData*)imageData thumbnailName:(NSString*)thumbPhotoId
+{
+    double len = [imageData length];
+    if (len > 70000)
+    {
+        /*
+         * to avoid pull thumbnail take to long to show in tmpLbl, eventDesc should have small photos from web, and usually better put small file the first [[..photoUrl..]]
+         */
+        UIImage* photo = [UIImage imageWithData:imageData];
+        photo = [ATHelper imageResizeWithImage:photo scaledToSize:CGSizeMake(THUMB_WIDTH, THUMB_HEIGHT)];
+        imageData = UIImageJPEGRepresentation(photo, JPEG_QUALITY);
+    }
+    NSString *thumbnailFile = [[ATHelper getWebCachePhotoDocummentoryPath] stringByAppendingPathComponent:thumbPhotoId];
+    NSError* error;
+    BOOL ret = [imageData writeToFile:thumbnailFile options:NSDataWritingAtomic error:&error];
+    
+    if (!ret)
+        NSLog(@" ---------- writing web thumbnail fail ...%@", [error localizedDescription]);
+}
+
+
+//thumbnail may be in two differenct local location
+// 1. bundled with App
+// 2. dynamically downloaded and cached
++ (UIImage*) getThumbnailImageFromLocal:(NSString*) fname
+{
+    NSString *thumbnailFile = [[ATHelper getWebCachePhotoDocummentoryPath] stringByAppendingPathComponent:fname];
+    UIImage* img = [UIImage imageWithContentsOfFile:thumbnailFile];
+    if (img == nil)
+    {
+        NSString *thumbnailFile = [[ATHelper getPreloadedPhotoBundlePath] stringByAppendingPathComponent:fname];
+        img = [UIImage imageWithContentsOfFile:thumbnailFile];
+    }
+    return img;
+}
+
 +(UIImage*)readPhotoFromFile:(NSString*)photoFileName eventId:photoDir
 {
     NSString* targetName = [[[NSBundle mainBundle] infoDictionary] objectForKey:@"CFBundleName"];
@@ -332,7 +528,7 @@ UIPopoverController *verifyViewPopover;
     {
         photoFileName = [[ATHelper getNewUnsavedEventPhotoPath] stringByAppendingPathComponent:photoFileName];
     }
-    else
+    else if (![photoFileName hasPrefix:@"/var/mobile/Containers/"]) //if not web photo saved in app container cache directory
     {
         photoFileName = [[[ATHelper getPhotoDocummentoryPath] stringByAppendingPathComponent:photoDir] stringByAppendingPathComponent:photoFileName];
     }
@@ -452,6 +648,35 @@ UIPopoverController *verifyViewPopover;
         }
     }
     return returnStr;
+}
+
+//find photo web url xxxx in desc text : ...[[xxxx]]...
+//Currently I only use the first one and convert to use as thumbnail,
+//Later I want to have multiple urls for multiple files save to cache directory, no need to backup to Dropbox
++ (NSArray*) getPhotoUrlsFromDescText: (NSString*)descTxt
+{
+    NSString *str = [NSMutableString stringWithString:descTxt];
+    NSMutableArray* returnPhotoUrlList = nil;
+    NSInteger loc = [str rangeOfString:@"[["].location;
+    while ( loc != NSNotFound) {
+        str = [str substringFromIndex:loc +2 ];
+        NSInteger loc2 = [str rangeOfString:@"]]"].location;
+        if (loc2 != NSNotFound)
+        {
+            NSString* urlStr = [str substringToIndex:loc2];
+            if ([urlStr rangeOfString:@"http"].location != NSNotFound && [urlStr rangeOfString:@" "].location == NSNotFound) //must have http literature, must NOT have space
+            {
+                if (returnPhotoUrlList == nil)
+                    returnPhotoUrlList = [[NSMutableArray alloc] init];
+                [returnPhotoUrlList addObject:urlStr];
+            }
+            str = [str substringFromIndex:loc2];
+            loc = [str rangeOfString:@"[["].location;
+        }
+        else
+            break;
+    }
+    return returnPhotoUrlList;
 }
 
 + (NSString*) clearMakerFromDescText: (NSString*)desc :(NSString*)markerName

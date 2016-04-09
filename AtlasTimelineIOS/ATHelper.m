@@ -583,6 +583,19 @@ UIPopoverController *verifyViewPopover;
     return thumnailImage;
 }
 
++ (NSString*)stripMetadataFromEventDesc:(NSString*) eventDesc
+{
+    NSString* retDesc = eventDesc;
+    NSArray* photoUrlList = [ATHelper getPhotoUrlsFromDescText:eventDesc];
+    if (photoUrlList != nil)
+    {
+        for (NSString* urlStr in photoUrlList)
+        {
+            retDesc = [retDesc stringByReplacingOccurrencesOfString: [NSString stringWithFormat:@"[[%@]]", urlStr] withString:@""];
+        }
+    }
+    return retDesc;
+}
 
 //not thread safe
 + (UIImage*)imageResizeWithImage:(UIImage*)image scaledToSize:(CGSize)newSize

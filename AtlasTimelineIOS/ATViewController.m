@@ -2112,12 +2112,8 @@ NSLog(@"--new-- %d, %@, %@", cnt,cluster.cluster.title, identifier);
     [self.eventEditor resetEventEditor];
     
     self.eventEditor.coordinate = ann.coordinate;
-    if ([ann.description isEqualToString:NEWEVENT_DESC_PLACEHOLD])
-    {
-        self.eventEditor.description.textColor = [UIColor lightGrayColor];
-    }
-    
-    self.eventEditor.description.text = ann.description;
+
+    self.eventEditor.description.text = [ATHelper stripMetadataFromEventDesc:ann.description];
     self.eventEditor.address.text= ann.address;
     self.eventEditor.address.editable = false;
     

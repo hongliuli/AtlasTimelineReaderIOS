@@ -45,6 +45,7 @@
 + (NSString*)getPhotoDocummentoryPath;
 + (NSString*)getNewUnsavedEventPhotoPath;
 + (BOOL) isAtLeastIOS8;
++ (NSString*)stripMetadataFromEventDesc:(NSString*) eventDesc;
 
 //photo related
 + (UIImage*)imageResizeWithImage:(UIImage*)image scaledToSize:(CGSize)newSize;

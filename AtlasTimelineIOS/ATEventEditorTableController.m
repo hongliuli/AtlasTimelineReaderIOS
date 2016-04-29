@@ -16,7 +16,7 @@
 #import "ATConstants.h"
 #import <QuartzCore/QuartzCore.h>
 #import <Social/Social.h>
-#import <iAd/iAd.h>
+#import <GoogleMobileAds/GoogleMobileAds.h>
 
 #define JPEG_QUALITY 1.0
 #define THUMB_JPEG_QUALITY 0.3
@@ -152,7 +152,6 @@ forRowAtIndexPath: (NSIndexPath*)indexPath
     }
     // I did not use iOS7's self.canDisplayBannerAds to automatically display adds, not sure why
     //if (ipad)
-    [self initiAdBanner];
     [self initgAdBanner];
 }
 - (UITableViewCell *)tableView:(UITableView *)tableView cellForRowAtIndexPath:(NSIndexPath *)indexPath
@@ -261,7 +260,6 @@ forRowAtIndexPath: (NSIndexPath*)indexPath
     {
         customView = [[UIView alloc] initWithFrame:CGRectMake(0.0, -20, 300.0, SECTION_1_ADVERTISE_HEIGHT)];
         [customView addSubview:self.gAdBannerView];
-        [customView addSubview:self.iAdBannerView];
     }
 
     return customView;
@@ -876,21 +874,7 @@ forRowAtIndexPath: (NSIndexPath*)indexPath
         lblNewAddedCount.hidden = false;
 }
 
-//iad/gAd
--(void)initiAdBanner
-{
-    NSString* targetName = [[[NSBundle mainBundle] infoDictionary] objectForKey:@"CFBundleName"];
-    if ([targetName hasPrefix:@"Cnet" ])
-        return;
-    if (!self.iAdBannerView)
-    {
-        //NSLog(@"----- iAdView height=%f ", self.view.frame.size.height);
-        CGRect rect = CGRectMake(0, 0, GAD_SIZE_320x50.width, GAD_SIZE_320x50.height);
-        self.iAdBannerView = [[ADBannerView alloc]initWithFrame:rect];
-        self.iAdBannerView.delegate = self;
-    }
-}
-
+//google Ad init
 -(void)initgAdBanner
 {
     NSString* targetName = [[[NSBundle mainBundle] infoDictionary] objectForKey:@"CFBundleName"];
@@ -904,7 +888,11 @@ forRowAtIndexPath: (NSIndexPath*)indexPath
         self.gAdBannerView.adUnitID = @"ca-app-pub-5383516122867647/8499480217";
         self.gAdBannerView.rootViewController = self;
         self.gAdBannerView.delegate = self;
-        self.gAdBannerView.hidden = TRUE;
+        self.gAdBannerView.hidden = false;
+        
+        GADRequest *request = [GADRequest request];
+        request.testDevices = @[ @"efaa3c516e17269775eca5baa3d3118b"];
+        [self.gAdBannerView loadRequest:request];
     }
 }
 -(void)hideBanner:(UIView*)banner
@@ -926,38 +914,6 @@ forRowAtIndexPath: (NSIndexPath*)indexPath
         [UIView commitAnimations];
         banner.hidden = FALSE;
     }
-}
-////////// iAd delegate
-// Called before the add is shown, time to move the view
-- (void)bannerViewWillLoadAd:(ADBannerView *)banner
-{
-    //NSLog(@"----- Editor iAd load");
-    [self hideBanner:self.gAdBannerView];
-    [self showBanner:self.iAdBannerView];
-}
-
-// Called when an error occured
-- (void)bannerView:(ADBannerView *)banner didFailToReceiveAdWithError:(NSError *)error
-{
-    //NSLog(@"###### Editor iAd error: %@", error);
-    [self hideBanner:self.iAdBannerView];
-    [self.gAdBannerView loadRequest:[GADRequest request]];
-}
-
-//////////gAd delegate
-// Called before ad is shown, good time to show the add
-- (void)adViewDidReceiveAd:(GADBannerView *)view
-{
-    //NSLog(@"------ Editor Admob load");
-    [self hideBanner:self.iAdBannerView];
-    [self showBanner:self.gAdBannerView];
-}
-
-// An error occured
-- (void)adView:(GADBannerView *)view didFailToReceiveAdWithError:(GADRequestError *)error
-{
-    //NSLog(@"########  Editor Admob error: %@", error);
-    [self hideBanner:self.gAdBannerView];
 }
 
 -(void)didRotateFromInterfaceOrientation:(UIInterfaceOrientation)interfaceOrientation

@@ -7,19 +7,19 @@
 //
 
 #import <Foundation/Foundation.h>
+#import <GoogleMobileAds/GoogleMobileAds.h>
 #import "ATEventAnnotation.h"
 #import "ATViewImagePickerController.h"
 #import "ATPhotoScrollView.h"
-#import <iAd/iAd.h>
-#import "GADBannerView.h"
 
 @protocol EventEditorDelegate ;
 
 @class ATViewController;
 @class ATEventEntity;
 @class ATEventDataStruct;
+@class ADBannerViewDelegate;
 
-@interface ATEventEditorTableController : UITableViewController <UITextFieldDelegate, ATImagePickerDelegate, UIPickerViewDelegate, UIPickerViewDataSource, ADBannerViewDelegate,GADBannerViewDelegate>
+@interface ATEventEditorTableController : UITableViewController <UITextFieldDelegate, ATImagePickerDelegate, UIPickerViewDelegate, UIPickerViewDataSource>
 {
     ATEventAnnotation * annotation;
 }
@@ -47,7 +47,6 @@
 @property (weak, nonatomic) IBOutlet UIBarButtonItem *deleteButton;
 @property (weak, nonatomic) IBOutlet UIBarButtonItem *saveButton;
 
-@property (strong, nonatomic) ADBannerView *iAdBannerView;
 @property (strong, nonatomic) GADBannerView *gAdBannerView;
 @property BOOL isFirstTimeAddPhoto;
 @property BOOL photoDescChangedFlag;

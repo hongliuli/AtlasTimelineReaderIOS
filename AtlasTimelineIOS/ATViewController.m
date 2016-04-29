@@ -237,7 +237,6 @@
         [self startAuthorView];
     }
     // I did not use iOS7's self.canDisplayBannerAds to automatically display adds, not sure why
-    [self initiAdBanner];
     [self initgAdBanner];
     
     if (switchEventListViewModeBtn == nil)
@@ -1048,7 +1047,6 @@
     int timeWindowY = self.view.bounds.size.height - [ATConstants timeScrollWindowHeight];
     int timeLineY = timeWindowY;
     [UIView beginAnimations:@"showBanner" context:nil];
-    self.iAdBannerView.frame = CGRectMake(self.iAdBannerView.frame.origin.x, self.iAdBannerView.frame.origin.y, GAD_SIZE_320x50.width, GAD_SIZE_320x50.height);
     self.gAdBannerView.frame = CGRectMake(self.gAdBannerView.frame.origin.x, self.gAdBannerView.frame.origin.y, GAD_SIZE_320x50.width, GAD_SIZE_320x50.height);
     [UIView commitAnimations];
     [UIView animateWithDuration:0.3
@@ -1071,7 +1069,6 @@
     int timeWindowY = self.view.bounds.size.height - [ATConstants timeScrollWindowHeight];
     int timeLineY = timeWindowY;
     [UIView beginAnimations:@"showBanner" context:nil];
-    self.iAdBannerView.frame = CGRectMake(self.iAdBannerView.frame.origin.x, self.iAdBannerView.frame.origin.y, 0, 0);
     self.gAdBannerView.frame = CGRectMake(self.gAdBannerView.frame.origin.x, self.gAdBannerView.frame.origin.y, 0, 0);
     [UIView commitAnimations];
     [UIView animateWithDuration:0.3
@@ -1102,7 +1099,7 @@
     if (UI_USER_INTERFACE_IDIOM() == UIUserInterfaceIdiomPhone)
         hideX = -110;
     [UIView beginAnimations:@"showBanner" context:nil];
-    self.iAdBannerView.frame = CGRectMake(self.iAdBannerView.frame.origin.x, self.iAdBannerView.frame.origin.y, GAD_SIZE_320x50.width, GAD_SIZE_320x50.height);
+
     self.gAdBannerView.frame = CGRectMake(self.gAdBannerView.frame.origin.x, self.gAdBannerView.frame.origin.y, GAD_SIZE_320x50.width, GAD_SIZE_320x50.height);
     [UIView commitAnimations];
     [UIView animateWithDuration:0.4
@@ -1134,7 +1131,6 @@
     int timeWindowY = self.view.bounds.size.height - [ATConstants timeScrollWindowHeight];
     int timeLineY = timeWindowY;
     [UIView beginAnimations:@"showBanner" context:nil];
-    self.iAdBannerView.frame = CGRectMake(self.iAdBannerView.frame.origin.x, self.iAdBannerView.frame.origin.y, 0,0);
     self.gAdBannerView.frame = CGRectMake(self.gAdBannerView.frame.origin.x, self.gAdBannerView.frame.origin.y, 0,0);
     [UIView commitAnimations];
     [UIView animateWithDuration:0.3
@@ -2566,11 +2562,9 @@ NSLog(@"--new-- %d, %@, %@", cnt,cluster.cluster.title, identifier);
     [self displayTimelineControls];
     [self calculateSearchBarFrame]; //in iPhone, make search bar wider in landscape
     [self closeTutorialView];
-    CGRect frame = self.iAdBannerView.frame;
+    CGRect frame = self.gAdBannerView.frame;
     frame.origin.y = [ATConstants screenHeight] - GAD_SIZE_320x50.height;
-    self.iAdBannerView.frame = frame;
-    
-    frame = self.gAdBannerView.frame;
+
     frame.origin.y = [ATConstants screenHeight] - GAD_SIZE_320x50.height;
     self.gAdBannerView.frame = frame;
 }
@@ -3047,22 +3041,6 @@ NSLog(@"--new-- %d, %@, %@", cnt,cluster.cluster.title, identifier);
         
     }
 }
--(void)initiAdBanner
-{
-    NSString* targetName = [[[NSBundle mainBundle] infoDictionary] objectForKey:@"CFBundleName"];
-    if ([targetName hasPrefix:@"Cnet"])
-        return;
-    if (!self.iAdBannerView)
-    {
-        CGRect rect = CGRectMake(40, [ATConstants screenHeight] - GAD_SIZE_320x50.height, GAD_SIZE_320x50.width, GAD_SIZE_320x50.height);
-        if (UI_USER_INTERFACE_IDIOM() == UIUserInterfaceIdiomPhone)
-            rect = CGRectMake(0, [ATConstants screenHeight] - GAD_SIZE_320x50.height, GAD_SIZE_320x50.width, GAD_SIZE_320x50.height);
-        self.iAdBannerView = [[ADBannerView alloc]initWithFrame:rect];
-        self.iAdBannerView.delegate = self;
-        self.iAdBannerView.hidden = TRUE;
-        [self.view addSubview:self.iAdBannerView];
-    }
-}
 
 -(void)initgAdBanner
 {
@@ -3078,8 +3056,12 @@ NSLog(@"--new-- %d, %@, %@", cnt,cluster.cluster.title, identifier);
         self.gAdBannerView.adUnitID = @"ca-app-pub-5383516122867647/8499480217";
         self.gAdBannerView.rootViewController = self;
         self.gAdBannerView.delegate = self;
-        self.gAdBannerView.hidden = TRUE;
+        self.gAdBannerView.hidden = false;
         [self.view addSubview:self.gAdBannerView];
+        
+        GADRequest *request = [GADRequest request];
+        request.testDevices = @[ @"efaa3c516e17269775eca5baa3d3118b"];
+        [self.gAdBannerView loadRequest:request];
     }
 }
 
@@ -3109,10 +3091,7 @@ NSLog(@"--new-- %d, %@, %@", cnt,cluster.cluster.title, identifier);
 {
     if (topFlag)
     {
-        CGRect frame = self.iAdBannerView.frame;
-        frame.origin.y = 0;
-        self.iAdBannerView.frame = frame;
-        frame = self.gAdBannerView.frame;
+        CGRect frame = self.gAdBannerView.frame;
         frame.origin.y = 0;
         self.gAdBannerView.frame = frame;
     }
@@ -3121,45 +3100,10 @@ NSLog(@"--new-- %d, %@, %@", cnt,cluster.cluster.title, identifier);
         int yPos = AD_Y_POSITION_IPAD;
         if (UI_USER_INTERFACE_IDIOM() == UIUserInterfaceIdiomPhone)
             yPos = AD_Y_POSITION_PHONE;
-        CGRect frame = self.iAdBannerView.frame;
-        frame.origin.y = yPos;
-        self.iAdBannerView.frame = frame;
-        frame = self.gAdBannerView.frame;
+        CGRect frame = self.gAdBannerView.frame;
         frame.origin.y = yPos;
         self.gAdBannerView.frame = frame;
     }
-}
-////////// iAd delegate
-// Called before the add is shown, time to move the view
-- (void)bannerViewWillLoadAd:(ADBannerView *)banner
-{
-    NSLog(@"----- iAd load");
-    [self hideBanner:self.gAdBannerView];
-    [self showBanner:self.iAdBannerView];
-}
-
-// Called when an error occured
-- (void)bannerView:(ADBannerView *)banner didFailToReceiveAdWithError:(NSError *)error
-{
-    NSLog(@"###### iAd error: %@", error);
-    [self hideBanner:self.iAdBannerView];
-    [self.gAdBannerView loadRequest:[GADRequest request]];
-}
-
-//////////gAd delegate
-// Called before ad is shown, good time to show the add
-- (void)adViewDidReceiveAd:(GADBannerView *)view
-{
-    NSLog(@"------ Admob load");
-    [self hideBanner:self.iAdBannerView];
-    [self showBanner:self.gAdBannerView];
-}
-
-// An error occured
-- (void)adView:(GADBannerView *)view didFailToReceiveAdWithError:(GADRequestError *)error
-{
-    NSLog(@"######## Admob error: %@", error);
-    [self hideBanner:self.gAdBannerView];
 }
 
 

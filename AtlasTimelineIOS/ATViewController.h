@@ -12,8 +12,7 @@
 #import "ATEventEditorTableController.h"
 #import "ATPreferenceViewController.h"
 #import <StoreKit/StoreKit.h>
-#import <iAd/iAd.h>
-#import "GADBannerView.h"
+#import <GoogleMobileAds/GoogleMobileAds.h>
 #import <MessageUI/MessageUI.h>
 #import "ADClusterMapView.h"
 
@@ -22,7 +21,7 @@
 @class ATTimeScrollWindowNew;
 @class ATTimeZoomLine;
 
-@interface ATViewController : UIViewController <MKMapViewDelegate, CLLocationManagerDelegate, EventEditorDelegate, UISearchDisplayDelegate, UISearchBarDelegate,UIAlertViewDelegate, ADBannerViewDelegate,GADBannerViewDelegate, MFMailComposeViewControllerDelegate>
+@interface ATViewController : UIViewController <MKMapViewDelegate, CLLocationManagerDelegate, EventEditorDelegate, UISearchDisplayDelegate, UISearchBarDelegate,UIAlertViewDelegate, MFMailComposeViewControllerDelegate>
 {
     ATDataController *dataController;
 
@@ -48,7 +47,6 @@
 @property (strong, nonatomic) NSDate* endDate;
 @property (strong, nonatomic) ATTimeZoomLine* timeZoomLine;
 
-@property (strong, nonatomic) ADBannerView *iAdBannerView;
 @property (strong, nonatomic) GADBannerView *gAdBannerView;
 @property int mapViewShowWhatFlag; //see MAPVIEW_SHOW_xxxxx macros
 

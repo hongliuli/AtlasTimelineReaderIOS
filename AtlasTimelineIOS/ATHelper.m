@@ -668,6 +668,8 @@ UIPopoverController *verifyViewPopover;
 //Later I want to have multiple urls for multiple files save to cache directory, no need to backup to Dropbox
 + (NSArray*) getPhotoUrlsFromDescText: (NSString*)descTxt
 {
+    if (descTxt == nil)
+        return nil;
     NSString *str = [NSMutableString stringWithString:descTxt];
     NSMutableArray* returnPhotoUrlList = nil;
     NSInteger loc = [str rangeOfString:@"[["].location;

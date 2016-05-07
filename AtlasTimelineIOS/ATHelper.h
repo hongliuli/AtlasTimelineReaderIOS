@@ -41,6 +41,7 @@
 + (NSString*)getPreloadedPhotoBundlePath; //previously named getBundlePath()
 + (NSString*)getWebCachePhotoDocummentoryPath;
 + (NSString*)convertWebUrlToFullPhotoPath:(NSString*)webPhotoUrl;
++ (NSString*)convertWebUrlToFileName:(NSString*)webPhotoUrl;
 + (NSString*)getRootBundlePath;
 + (NSString*)getPhotoDocummentoryPath;
 + (NSString*)getNewUnsavedEventPhotoPath;
@@ -61,6 +62,7 @@
 + (UIColor *) colorWithHexString: (NSString *) stringToConvert;
 + (NSString*) getMarkerNameFromDescText: (NSString*)descTxt;
 + (NSArray*) getPhotoUrlsFromDescText: (NSString*)descTxt;
++ (NSDictionary*) getPhotoDescFromDescText: (NSString*)descTxt;
 + (NSString*) clearMakerFromDescText: (NSString*)desc :(NSString*)markerName;
 + (NSString*) clearMakerAllFromDescText: (NSString*)desc;
 + (NSArray*) getEventListWithUniqueIds: (NSArray*)uniqueIds;

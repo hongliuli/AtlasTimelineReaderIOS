@@ -135,6 +135,14 @@ forRowAtIndexPath: (NSIndexPath*)indexPath
     }
     self.address.backgroundColor = [UIColor clearColor]; // [UIColor colorWithRed:1 green:1 blue:1 alpha:0.4];
     self.description.backgroundColor = [UIColor whiteColor];
+    
+    //TODO not sure why when max/min, resetEditor will be execute first then come here
+    //     use this unknown issue, I can resolve max/min here. but need more study
+    ATAppDelegate *appDelegate = (ATAppDelegate *)[[UIApplication sharedApplication] delegate];
+    ATEventDataStruct* evt = appDelegate.focusedEvent;
+    self.description.text = [ATHelper stripMetadataFromEventDesc:evt.eventDesc];
+    //End above TODO
+    
     NSUserDefaults* userDefault = [NSUserDefaults standardUserDefaults];
     NSString* currentAuthorMode = [userDefault valueForKey:AUTHOR_MODE_KEY];
     

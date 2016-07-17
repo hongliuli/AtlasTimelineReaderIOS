@@ -167,14 +167,17 @@
     [ATHelper createPhotoDocumentoryPath];
     [ATHelper createWebCachePhotoDocumentoryPath];
     //ATAppDelegate *appDelegate = (ATAppDelegate *)[[UIApplication sharedApplication] delegate];
-    self.locationManager = [[CLLocationManager alloc] init];
-    //add for ios8
-    self.locationManager.delegate = self;
-    if ([ATHelper isAtLeastIOS8]) {
-        [self.locationManager requestWhenInUseAuthorization];
-        [self.locationManager requestAlwaysAuthorization];
+    NSString* targetName = [[[NSBundle mainBundle] infoDictionary] objectForKey:@"CFBundleName"];
+    if ([targetName hasPrefix:@"WorldHeritage"])
+    {
+        self.locationManager = [[CLLocationManager alloc] init];
+        //add for ios8
+        self.locationManager.delegate = self;
+        if ([ATHelper isAtLeastIOS8]) {
+            [self.locationManager requestWhenInUseAuthorization];
+            [self.locationManager requestAlwaysAuthorization];
+        }
     }
-    
     self.mapViewShowWhatFlag = MAPVIEW_SHOW_ALL;
     int searchBarHeight = [ATConstants searchBarHeight];
     int searchBarWidth = [ATConstants searchBarWidth];
@@ -247,7 +250,6 @@
     [switchEventListViewModeBtn.titleLabel setFont:[UIFont fontWithName:@"Arial-Bold" size:25]];
     [[switchEventListViewModeBtn layer] setBorderWidth:2.0f];
     
-    NSString* targetName = [[[NSBundle mainBundle] infoDictionary] objectForKey:@"CFBundleName"];
     if ([targetName hasPrefix:@"WorldHeritage"])
         [self setSwitchButtonMapMode];
     else
@@ -863,17 +865,20 @@
     //TODO tmpXcode5ScreenWidth should be decommissioned when use xcode6
     int tmpXcode5ScreenWidth = [ATConstants screenWidth];
     
-    //NOTE the trick to set background image for a bar buttonitem
-    if (locationbtn == nil)
-        locationbtn = [UIButton buttonWithType:UIButtonTypeCustom];
-    else
-        [locationbtn removeFromSuperview];
-    //locationbtn.frame = CGRectMake([ATConstants screenWidth] - 50, 90, 30, 30);
-    locationbtn.frame = CGRectMake(tmpXcode5ScreenWidth - 50, 90, 30, 30);
-    [locationbtn setImage:[UIImage imageNamed:@"currentLocation.png"] forState:UIControlStateNormal];
-    [locationbtn addTarget:self action:@selector(currentLocationClicked:) forControlEvents:UIControlEventTouchUpInside];
-    [self.mapView addSubview:locationbtn];
-    
+    NSString* targetName = [[[NSBundle mainBundle] infoDictionary] objectForKey:@"CFBundleName"];
+    if ([targetName hasPrefix:@"WorldHeritage"])
+    {
+        //NOTE the trick to set background image for a bar buttonitem
+        if (locationbtn == nil)
+            locationbtn = [UIButton buttonWithType:UIButtonTypeCustom];
+        else
+            [locationbtn removeFromSuperview];
+        //locationbtn.frame = CGRectMake([ATConstants screenWidth] - 50, 90, 30, 30);
+        locationbtn.frame = CGRectMake(tmpXcode5ScreenWidth - 50, 90, 30, 30);
+        [locationbtn setImage:[UIImage imageNamed:@"currentLocation.png"] forState:UIControlStateNormal];
+        [locationbtn addTarget:self action:@selector(currentLocationClicked:) forControlEvents:UIControlEventTouchUpInside];
+        [self.mapView addSubview:locationbtn];
+    }
     [self displayZoomLine];
 }
 

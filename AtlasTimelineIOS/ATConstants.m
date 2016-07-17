@@ -86,15 +86,10 @@
 }
 + (NSString*)WhiteFlagAnnotationIdentifier:(BOOL)mapMode :(NSString*)eventTag
 {
-    if (mapMode)
-    {
-        if ([eventTag hasPrefix:@"Natur"])
+        if ([eventTag hasPrefix:@"Natur"]) //for nature heritage
             return @"small-green-ball-icon.png";
         else
             return @"small-red-ball-icon.png";
-    }
-    else
-        return @"small-white-flag.png";
 }
 + (int) screenWidth
 {

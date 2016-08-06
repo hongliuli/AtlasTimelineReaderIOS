@@ -36,6 +36,7 @@
 #import "ATCell.h"
 #import "Toast+UIView.h"
 #import "ADClusterAnnotation.h"
+#import "KMLParser.h"
 
 #define EVENT_TYPE_NO_PHOTO 0
 #define EVENT_TYPE_HAS_PHOTO 1
@@ -115,6 +116,7 @@
     int timeLinkDepthDirectionFuture;
     int timeLinkDepthDirectionPast;
     NSMutableArray* overlaysToBeCleaned ;
+    NSMutableSet* nonKmlOverlaySet;
     
     ATAnnotationFocused* focusedAnnotationIndicator;
     int currentTapTouchKey;
@@ -149,6 +151,10 @@
     
     NSDate* lastUpdateMapInRegionDidChange;
     int prevZoomLevel;
+    
+    KMLParser* kmlParser;
+    NSMutableDictionary* whichKmlParserToRenderDict;
+    NSArray *kmlOverlays ; //should be local, put here for test
 }
 
 @synthesize mapView = _mapView;
@@ -261,6 +267,9 @@
     [self.mapView addSubview:switchEventListViewModeBtn];
     eventListInVisibleMapArea = nil;
     [self refreshEventListView:false];
+    if (nonKmlOverlaySet == nil)
+        nonKmlOverlaySet = [[NSMutableSet alloc] init];
+   // [self loadOverlayFromKmlBundleFilename:@"KMLFor三国"];
     
 }
 -(void) viewDidAppear:(BOOL)animated
@@ -288,7 +297,66 @@
         [self.mapView addSubview:eventListView];
     }
     [self refreshEventListView:false];
+ 
+}
+
+- (void) loadOverlayFromKmlBundleFilename:(NSString*)filename
+{
+    NSString* filePath = [[NSBundle mainBundle] pathForResource:filename ofType:@"kml"];
+    NSURL *url = [NSURL fileURLWithPath:filePath];
+    kmlParser = [[KMLParser alloc] initWithURL:url];
+    [self loadOverlayFromKmlParser];
+}
+
+- (void) loadOverlayFromKmlString: (NSString*)kmlString
+{
+    kmlParser = [[KMLParser alloc] initWithString:kmlString];
+    [self loadOverlayFromKmlParser];
+}
+
+- (void) loadOverlayFromKmlParser
+{
+    if (kmlParser == nil)
+    {
+        NSLog(@"##################### init kmlParser first please #############");
+        return;
+    }
     
+    [kmlParser parseKML];
+    
+    // Add all of the MKOverlay objects parsed from the KML file to the map.
+    NSArray *overlays = [kmlParser overlays];
+    [self.mapView addOverlays:overlays];
+    
+    // Add all of the MKAnnotation objects parsed from the KML file to the map.
+    NSArray *annotations = [kmlParser points];
+    [self.mapView addAnnotations:annotations];
+
+    /*
+    // Walk the list of overlays and annotations and create a MKMapRect that
+    // bounds all of them and store it into flyTo.
+    MKMapRect flyTo = MKMapRectNull;
+    for (id <MKOverlay> overlay in overlays) {
+        if (MKMapRectIsNull(flyTo)) {
+            flyTo = [overlay boundingMapRect];
+        } else {
+            flyTo = MKMapRectUnion(flyTo, [overlay boundingMapRect]);
+        }
+    }
+    
+    for (id <MKAnnotation> annotation in annotations) {
+        MKMapPoint annotationPoint = MKMapPointForCoordinate(annotation.coordinate);
+        MKMapRect pointRect = MKMapRectMake(annotationPoint.x, annotationPoint.y, 0, 0);
+        if (MKMapRectIsNull(flyTo)) {
+            flyTo = pointRect;
+        } else {
+            flyTo = MKMapRectUnion(flyTo, pointRect);
+        }
+    }
+    
+    // Position the map so that all overlays and annotations are visible on screen.
+    self.mapView.visibleMapRect = flyTo;
+    */
 }
 
 -(void)setSwitchButtonTimeMode
@@ -2170,40 +2238,47 @@ NSLog(@"--new-- %d, %@, %@", cnt,cluster.cluster.title, identifier);
     
     //following prepare mkPoi
     
-    NSArray* overlays = [self prepareOverlays:focusedEvent];
+    NSDictionary* overlaysDict = [self prepareOverlays:focusedEvent];
+    kmlOverlays = [overlaysDict objectForKey:@"KML"];
+    NSArray *nonkmlOverlays = [overlaysDict objectForKey:@"NONEKML"];
     
     //TODO ### have problem here for Reader
-    [overlaysToBeCleaned addObjectsFromArray:overlays];
-    
+    [overlaysToBeCleaned addObjectsFromArray:kmlOverlays];
+    [overlaysToBeCleaned addObjectsFromArray:nonkmlOverlays];
     
     
     // http://stackoverflow.com/questions/15061207/how-to-draw-a-straight-line-on-an-ios-map-without-moving-the-map-using-mkmapkit
     //add line by line, instead add all lines in one MKPolyline object, because I want to draw color differently in viewForOverlay
-    NSUInteger size = [overlays count];
-    for(int i = 0; i < size; i++)
-    {
-        MKPolygon* polygon = overlays[i];
-        [self.mapView addOverlay:polygon];
-    }
+    [self.mapView addOverlays:nonkmlOverlays];
+    [nonKmlOverlaySet addObjectsFromArray:nonkmlOverlays];
+    /////[self.mapView addOverlays:kmlOverlays];
 }
 
-- (NSArray*) prepareOverlays:(ATEventDataStruct*)ent
+- (NSDictionary*) prepareOverlays:(ATEventDataStruct*)ent
 {
-    NSMutableArray* returnOverlays = [[NSMutableArray alloc] init];
+    NSMutableDictionary* returnOverlaysDict = [[NSMutableDictionary alloc] init];
+    NSMutableArray* oldOverlays = [[NSMutableArray alloc] init];
+    NSMutableArray* kmlOverlaysLocal =  [[NSMutableArray alloc] init];
     ATAppDelegate *appDelegate = (ATAppDelegate *)[[UIApplication sharedApplication] delegate];
+    
+    
+    //TODO  overlayCollection should be break into two: one of nonKmlOverlay and one for overlay
+    
+    
     NSArray* overlays = [appDelegate.overlayCollection objectForKey:ent.uniqueId];
     if (overlays == nil)
         return nil;
+    [whichKmlParserToRenderDict removeAllObjects];
     for (NSArray* polygonLines in overlays)
     {
         if (polygonLines == nil || [polygonLines count] == 0)
             continue;
         NSArray* shareOverlayArray = polygonLines;
-        if ([polygonLines count] == 1) //this will be case for ShareOverlay key
+        if ([polygonLines count] == 1 && [polygonLines[0] rangeOfString:@"<kml" options:NSCaseInsensitiveSearch].location == NSNotFound) //this will be case for ShareOverlay key
         {
             NSString* key = [polygonLines[0] lowercaseString]; //make key case insensitive
             shareOverlayArray = [appDelegate.sharedOverlayCollection objectForKey:key];
-            if (shareOverlayArray == nil || [shareOverlayArray count] <= 2)
+            if (shareOverlayArray == nil || [shareOverlayArray count] == 0)
             {
                 NSLog(@"  ##### shareOverlay %@ has data issue ", polygonLines[0]);
                 UIAlertView *alert = [[UIAlertView alloc] initWithTitle:NSLocalizedString(@"ShareOverlay data issue with following shareOverlay key:",nil) message:NSLocalizedString(polygonLines[0],nil)
@@ -2211,55 +2286,93 @@ NSLog(@"--new-- %d, %@, %@", cnt,cluster.cluster.title, identifier);
                 [alert show];
             }
         }
-        //MKMapPoint* overlayRegion2D = malloc(sizeof(CLLocationCoordinate2D) * [regionLineArray count]);
-        CLLocationCoordinate2D* overlayRegion2D = malloc(sizeof(CLLocationCoordinate2D) * [shareOverlayArray count]);
         
-        for (int i=0; i<[shareOverlayArray count];i++)
+        if ([shareOverlayArray count] == 1 && [shareOverlayArray[0] rangeOfString:@"<kml" options:NSCaseInsensitiveSearch].location != NSNotFound)
         {
-            NSString* lineStr = shareOverlayArray[i];
-            //in AppDelegate, lineStr are processed to be valid, so no need to check nil, empty here
-            NSArray* latlng = [lineStr componentsSeparatedByString:@","];
-            if (latlng == nil)
+            NSString* tmpT = [shareOverlayArray[0] substringFromIndex:1];
+            KMLParser *kp = [[KMLParser alloc] initWithString:tmpT];
+            [kp parseKML];
+            NSArray* thisOverlays = [kp overlays];
+            if (whichKmlParserToRenderDict == nil)
+                whichKmlParserToRenderDict = [[NSMutableDictionary alloc] init];
+            for (MKPolygon* poly in thisOverlays)
             {
-                NSLog(@" ###### ATViewController latlng data has error %@",lineStr);
-                CLLocationCoordinate2D workingCoordinate;
-                workingCoordinate.latitude = 0.0;
-                workingCoordinate.longitude = 0.0;
-                //overlayRegion2D[i] = MKMapPointForCoordinate(workingCoordinate);
-                overlayRegion2D[i] = workingCoordinate;
+                NSString* tt = poly.title; //this is name entered in google map
+                if (tt != nil)
+                    [whichKmlParserToRenderDict setObject:kp forKey:tt];
             }
-            else
-            {
-                //Note, do not know why, the kml file has lat/lng in postion 1, 0
-                double lat = [latlng[1] doubleValue];
-                double lng = [latlng[0] doubleValue];
-                CLLocationCoordinate2D workingCoordinate;
-                
-                workingCoordinate.latitude = lat;
-                workingCoordinate.longitude = lng;
-                //overlayRegion2D[i] = MKMapPointForCoordinate(workingCoordinate);
-                overlayRegion2D[i] = workingCoordinate;
-            }
+            [self.mapView addOverlays:thisOverlays];
+            [kmlOverlaysLocal addObjectsFromArray:thisOverlays];
         }
-        
-        MKPolygon* polygon = [MKPolygon polygonWithCoordinates:overlayRegion2D count:[shareOverlayArray count]];
-        free(overlayRegion2D);
-        [returnOverlays addObject:polygon];
+        else
+        {
+            //MKMapPoint* overlayRegion2D = malloc(sizeof(CLLocationCoordinate2D) * [regionLineArray count]);
+            CLLocationCoordinate2D* overlayRegion2D = malloc(sizeof(CLLocationCoordinate2D) * [shareOverlayArray count]);
+            
+            for (int i=0; i<[shareOverlayArray count];i++)
+            {
+                NSString* lineStr = shareOverlayArray[i];
+                //in AppDelegate, lineStr are processed to be valid, so no need to check nil, empty here
+                NSArray* latlng = [lineStr componentsSeparatedByString:@","];
+                if (latlng == nil)
+                {
+                    NSLog(@" ###### ATViewController latlng data has error %@",lineStr);
+                    CLLocationCoordinate2D workingCoordinate;
+                    workingCoordinate.latitude = 0.0;
+                    workingCoordinate.longitude = 0.0;
+                    //overlayRegion2D[i] = MKMapPointForCoordinate(workingCoordinate);
+                    overlayRegion2D[i] = workingCoordinate;
+                }
+                else
+                {
+                    //Note, do not know why, the kml file has lat/lng in postion 1, 0
+                    double lat = [latlng[1] doubleValue];
+                    double lng = [latlng[0] doubleValue];
+                    CLLocationCoordinate2D workingCoordinate;
+                    
+                    workingCoordinate.latitude = lat;
+                    workingCoordinate.longitude = lng;
+                    //overlayRegion2D[i] = MKMapPointForCoordinate(workingCoordinate);
+                    overlayRegion2D[i] = workingCoordinate;
+                }
+            }
+            
+            MKPolygon* polygon = [MKPolygon polygonWithCoordinates:overlayRegion2D count:[shareOverlayArray count]];
+            free(overlayRegion2D);
+            [oldOverlays addObject:polygon];
+        }
     }
-    return returnOverlays;
+    [returnOverlaysDict setObject:kmlOverlaysLocal forKey:@"KML"];
+    [returnOverlaysDict setObject:oldOverlays forKey:@"NONEKML"];
+    return returnOverlaysDict;
 }
 
-- (MKOverlayView *)mapView:(MKMapView *)mapView viewForOverlay:(id <MKOverlay>)overlay
-{
-    if([overlay isKindOfClass:[MKPolygon class]]){
-        MKPolygonView *view = [[MKPolygonView alloc] initWithOverlay:overlay];
-        view.lineWidth=0;
-        view.strokeColor=[UIColor clearColor];
-        view.fillColor=[[UIColor blackColor] colorWithAlphaComponent:0.3];
-        return view;
+//redired viewForOverlay
+- (MKOverlayRenderer *)mapView:(MKMapView *)mapView rendererForOverlay:(id<MKOverlay>)overlay {
+    if ([nonKmlOverlaySet containsObject:overlay])
+    {
+        [nonKmlOverlaySet removeObject:overlay];
+        if([overlay isKindOfClass:[MKPolygon class]]){
+            MKPolygonView *view = [[MKPolygonView alloc] initWithOverlay:overlay];
+            view.lineWidth=0;
+            view.strokeColor=[UIColor clearColor];
+            view.fillColor=[[UIColor blackColor] colorWithAlphaComponent:0.3];
+            return view;
+        }
     }
+
+    else //above is for old style overlay for www2/www1 application, below is for kml
+    {
+        MKPolygon* p = (MKPolygon*)overlay;
+        NSString* tt = p.title; //entered in google map into kml, it is important to be used to identify kmlparser instance
+
+        KMLParser* kp = [whichKmlParserToRenderDict objectForKey:tt];
+        return [kp rendererForOverlay:overlay];
+    }
+
     return nil;
 }
+
 
 //I could not explain, but for tap left annotation button to focuse date, have to to do focusedRow++ in ATTimeScrollWindowNew
 - (void) setNewFocusedDateAndUpdateMap:(ATEventDataStruct*) ent needAdjusted:(BOOL)needAdjusted

@@ -261,9 +261,21 @@ static void strToCoords(NSString *str, CLLocationCoordinate2D **coordsOut, NSUIn
     return self;
 }
 
+- (instancetype)initWithString:(NSString *)kmlString {
+    if (self = [super init]) {
+        _styles = [[NSMutableDictionary alloc] init];
+        _placemarks = [[NSMutableArray alloc] init];
+        NSData *kmlData = [NSData dataWithBytes:[kmlString UTF8String] length:[kmlString length]];
+        _xmlParser = [[NSXMLParser alloc] initWithData:kmlData];
+        
+        [_xmlParser setDelegate:self];
+    }
+    return self;
+}
 
 - (void)parseKML {
     [_xmlParser parse];
+    NSError *parseError = [_xmlParser parserError];
     [self assignStyles];
 }
 

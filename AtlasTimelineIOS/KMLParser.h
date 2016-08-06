@@ -29,6 +29,7 @@
 }
 
 - (instancetype)initWithURL:(NSURL *)url;
+- (instancetype)initWithString:(NSString *)kmlString;
 - (void)parseKML;
 
 @property (unsafe_unretained, nonatomic, readonly) NSArray *overlays;

@@ -152,9 +152,8 @@
     NSDate* lastUpdateMapInRegionDidChange;
     int prevZoomLevel;
     
-    KMLParser* kmlParser;
+    KMLParser* kmlParserForAlwaysDisplayedOverlay;
     NSMutableDictionary* whichKmlParserToRenderDict;
-    NSArray *kmlOverlays ; //should be local, put here for test
 }
 
 @synthesize mapView = _mapView;
@@ -269,7 +268,8 @@
     [self refreshEventListView:false];
     if (nonKmlOverlaySet == nil)
         nonKmlOverlaySet = [[NSMutableSet alloc] init];
-   // [self loadOverlayFromKmlBundleFilename:@"KMLFor三国"];
+    //if (target == "三国")
+        [self loadOverlayFromKmlBundleFilename:@"KMLFor三国"];
     
 }
 -(void) viewDidAppear:(BOOL)animated
@@ -304,59 +304,18 @@
 {
     NSString* filePath = [[NSBundle mainBundle] pathForResource:filename ofType:@"kml"];
     NSURL *url = [NSURL fileURLWithPath:filePath];
-    kmlParser = [[KMLParser alloc] initWithURL:url];
-    [self loadOverlayFromKmlParser];
-}
-
-- (void) loadOverlayFromKmlString: (NSString*)kmlString
-{
-    kmlParser = [[KMLParser alloc] initWithString:kmlString];
-    [self loadOverlayFromKmlParser];
-}
-
-- (void) loadOverlayFromKmlParser
-{
-    if (kmlParser == nil)
-    {
-        NSLog(@"##################### init kmlParser first please #############");
-        return;
-    }
-    
-    [kmlParser parseKML];
+    kmlParserForAlwaysDisplayedOverlay = [[KMLParser alloc] initWithURL:url];
+  
+    //All <Placemark> name in KML must contains substr like "ALWAYS_DISPLAYED_OVERLAY_"
+    [kmlParserForAlwaysDisplayedOverlay parseKML];
     
     // Add all of the MKOverlay objects parsed from the KML file to the map.
-    NSArray *overlays = [kmlParser overlays];
+    NSArray *overlays = [kmlParserForAlwaysDisplayedOverlay overlays];
     [self.mapView addOverlays:overlays];
     
     // Add all of the MKAnnotation objects parsed from the KML file to the map.
-    NSArray *annotations = [kmlParser points];
+    NSArray *annotations = [kmlParserForAlwaysDisplayedOverlay points];
     [self.mapView addAnnotations:annotations];
-
-    /*
-    // Walk the list of overlays and annotations and create a MKMapRect that
-    // bounds all of them and store it into flyTo.
-    MKMapRect flyTo = MKMapRectNull;
-    for (id <MKOverlay> overlay in overlays) {
-        if (MKMapRectIsNull(flyTo)) {
-            flyTo = [overlay boundingMapRect];
-        } else {
-            flyTo = MKMapRectUnion(flyTo, [overlay boundingMapRect]);
-        }
-    }
-    
-    for (id <MKAnnotation> annotation in annotations) {
-        MKMapPoint annotationPoint = MKMapPointForCoordinate(annotation.coordinate);
-        MKMapRect pointRect = MKMapRectMake(annotationPoint.x, annotationPoint.y, 0, 0);
-        if (MKMapRectIsNull(flyTo)) {
-            flyTo = pointRect;
-        } else {
-            flyTo = MKMapRectUnion(flyTo, pointRect);
-        }
-    }
-    
-    // Position the map so that all overlays and annotations are visible on screen.
-    self.mapView.visibleMapRect = flyTo;
-    */
 }
 
 -(void)setSwitchButtonTimeMode
@@ -2239,7 +2198,7 @@ NSLog(@"--new-- %d, %@, %@", cnt,cluster.cluster.title, identifier);
     //following prepare mkPoi
     
     NSDictionary* overlaysDict = [self prepareOverlays:focusedEvent];
-    kmlOverlays = [overlaysDict objectForKey:@"KML"];
+    NSArray* kmlOverlays = [overlaysDict objectForKey:@"KML"];
     NSArray *nonkmlOverlays = [overlaysDict objectForKey:@"NONEKML"];
     
     //TODO ### have problem here for Reader
@@ -2366,8 +2325,13 @@ NSLog(@"--new-- %d, %@, %@", cnt,cluster.cluster.title, identifier);
         MKPolygon* p = (MKPolygon*)overlay;
         NSString* tt = p.title; //entered in google map into kml, it is important to be used to identify kmlparser instance
 
-        KMLParser* kp = [whichKmlParserToRenderDict objectForKey:tt];
-        return [kp rendererForOverlay:overlay];
+        if ([tt rangeOfString:@"ALWAYS_DISPLAYED_OVERLAY_"].location != NSNotFound)
+            return [kmlParserForAlwaysDisplayedOverlay rendererForOverlay:overlay];
+        else
+        {
+            KMLParser* kp = [whichKmlParserToRenderDict objectForKey:tt];
+            return [kp rendererForOverlay:overlay];
+        }
     }
 
     return nil;

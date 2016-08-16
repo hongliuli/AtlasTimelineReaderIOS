@@ -325,6 +325,7 @@
             //Now process overlay.  [Overlay]number,number number,number ..
             //                      [Overlay]number,number number,number ..
             //                      [Overlay]shareOverlayKey  the overlay is in [ShareOverlay]
+            //                      [overlay]<kml  ...
             if (overlayFromRange.location != NSNotFound) {
                 
                 tmp = [tmp substringFromIndex:overlayFromRange.location];
@@ -346,18 +347,25 @@
                 {
                     if (overlayDataStr == nil || [overlayDataStr length] == 0)
                         continue;
-                    //in a [Region], polygon lines can be separated by " " or "\n" or compbination
-                    NSString* allSpaceSepStr = [overlayDataStr stringByReplacingOccurrencesOfString:@"\n" withString:@" "];
-                    NSArray* lines = [allSpaceSepStr componentsSeparatedByString:@" "]; //Google's "My Map" export KML data is separated by space
                     NSMutableArray* processedLines = [[NSMutableArray alloc] init];
-                    if (lines == nil || [lines count] == 0)
-                        continue;
-                    for (NSString* lineStr in lines)
+                    if ([overlayDataStr rangeOfString:@"<kml" options:NSCaseInsensitiveSearch].location != NSNotFound)
                     {
-                        if (lineStr == nil || [lineStr length] == 0)
+                        [processedLines addObject:overlayDataStr];
+                    }
+                    else
+                    {
+                        //in a [Region], polygon lines can be separated by " " or "\n" or compbination
+                        NSString* allSpaceSepStr = [overlayDataStr stringByReplacingOccurrencesOfString:@"\n" withString:@" "];
+                        NSArray* lines = [allSpaceSepStr componentsSeparatedByString:@" "]; //Google's "My Map" export KML data is separated by space
+                        if (lines == nil || [lines count] == 0)
                             continue;
-                        NSString* line = [lineStr stringByTrimmingCharactersInSet:[NSCharacterSet whitespaceAndNewlineCharacterSet]];
-                        [processedLines addObject:line];
+                        for (NSString* lineStr in lines)
+                        {
+                            if (lineStr == nil || [lineStr length] == 0)
+                                continue;
+                            NSString* line = [lineStr stringByTrimmingCharactersInSet:[NSCharacterSet whitespaceAndNewlineCharacterSet]];
+                            [processedLines addObject:line];
+                        }
                     }
                     [overlayList addObject:processedLines]; //shareOverlay key should also add in as one line
                 }
@@ -367,7 +375,8 @@
         }
         //Here is to parse whole file again to get shareOverlay data (ShareOverlay data will be put at end of file)
         //Data format [ShareOverlay]key1 number,number number,number
-        //            [ShareOverlay]key2 number,number number,number ...
+        //            [ShareOverlay]key2 number,number number,number
+        //            [ShareOverlay]key3 <kml  .....
         NSUInteger firstShareOverlayLoc = [eventsString rangeOfString:@"[ShareOverlay]"].location;
         if (firstShareOverlayLoc != NSNotFound)
         {
@@ -384,33 +393,43 @@
                 if (polygonLinesStr == nil || [polygonLinesStr isEqualToString:@""])
                     continue;
                 
-                //in a [ShareRegion], first is key, then polygon lines. Separater can be separated by " " or "\n' (or combination)
-                NSString* tmp = [polygonLinesStr stringByTrimmingCharactersInSet:[NSCharacterSet whitespaceAndNewlineCharacterSet]];
-                tmp = [tmp stringByReplacingOccurrencesOfString:@"\n" withString:@" "];
-                
-                NSArray* lines = [tmp componentsSeparatedByString:@" "]; //Google's "My Map" export KML data is separated by space
                 NSMutableArray* polygonLines = [[NSMutableArray alloc] init];
-                for (int i = 0; i< [lines count]; i++)
+                //in a [ShareRegion], first is key, then polygon lines. Separater can be separated by " " or "\n' (or combination)
+                if ([polygonLinesStr rangeOfString:@"<kml" options:NSCaseInsensitiveSearch].location != NSNotFound)
                 {
-                    NSString* line = [lines[i] stringByTrimmingCharactersInSet:[NSCharacterSet whitespaceAndNewlineCharacterSet]];
-                    NSString* key = nil;
-                    if (i == 0) //first one must be key
+                    NSRange nameLocation = [polygonLinesStr rangeOfCharacterFromSet:[NSCharacterSet whitespaceAndNewlineCharacterSet]];
+                    NSString* key = [[polygonLinesStr substringToIndex:nameLocation.location] lowercaseString];
+                    [polygonLines addObject:[polygonLinesStr substringFromIndex:nameLocation.location]];
+                    [_sharedOverlayCollection setObject:polygonLines forKey:key];
+                }
+                else //non kml, for ww1/ww2 backward compatibility
+                {
+                    NSString* tmp = [polygonLinesStr stringByTrimmingCharactersInSet:[NSCharacterSet whitespaceAndNewlineCharacterSet]];
+                    tmp = [tmp stringByReplacingOccurrencesOfString:@"\n" withString:@" "];
+                    
+                    NSArray* lines = [tmp componentsSeparatedByString:@" "]; //Google's "My Map" export KML data is separated by space
+                    for (int i = 0; i< [lines count]; i++)
                     {
-                        key = [line lowercaseString]; //make shareOverlay key case insenstive. see ATViewController where fetch the key
-                        if (key == nil || [key isEqualToString:@""])
+                        NSString* line = [lines[i] stringByTrimmingCharactersInSet:[NSCharacterSet whitespaceAndNewlineCharacterSet]];
+                        NSString* key = nil;
+                        if (i == 0) //first one must be key
                         {
-                            NSLog(@"  ####### SharedOverlay key has error %@", line);
-                            UIAlertView *alert = [[UIAlertView alloc] initWithTitle:NSLocalizedString(@"read file sharedOverlay key has error",nil) message:line
-                                                                           delegate:self  cancelButtonTitle:NSLocalizedString(@"OK",nil) otherButtonTitles:nil];
-                            [alert show];
+                            key = [line lowercaseString]; //make shareOverlay key case insenstive. see ATViewController where fetch the key
+                            if (key == nil || [key isEqualToString:@""])
+                            {
+                                NSLog(@"  ####### SharedOverlay key has error %@", line);
+                                UIAlertView *alert = [[UIAlertView alloc] initWithTitle:NSLocalizedString(@"read file sharedOverlay key has error",nil) message:line
+                                                                               delegate:self  cancelButtonTitle:NSLocalizedString(@"OK",nil) otherButtonTitles:nil];
+                                [alert show];
+                            }
+                            [_sharedOverlayCollection setObject:polygonLines forKey:key];
                         }
-                        [_sharedOverlayCollection setObject:polygonLines forKey:key];
-                    }
-                    else
-                    {
-                        if (line == nil || [line isEqualToString:@""])
-                            continue;
-                        [polygonLines addObject:line];
+                        else
+                        {
+                            if (line == nil || [line isEqualToString:@""])
+                                continue;
+                            [polygonLines addObject:line];
+                        }
                     }
                 }
             }

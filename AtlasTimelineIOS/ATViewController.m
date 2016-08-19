@@ -115,7 +115,7 @@
     ADClusterAnnotation* selectedEventAnnotation;
     int timeLinkDepthDirectionFuture;
     int timeLinkDepthDirectionPast;
-    NSMutableArray* overlaysToBeCleaned ;
+    NSMutableDictionary* overlaysToBeCleaned ;
     NSMutableSet* nonKmlOverlaySet;
     
     ATAnnotationFocused* focusedAnnotationIndicator;
@@ -268,7 +268,7 @@
     [self refreshEventListView:false];
     if (nonKmlOverlaySet == nil)
         nonKmlOverlaySet = [[NSMutableSet alloc] init];
-    //if (target == "三国")
+    if ([targetName hasPrefix:@"三国"])
         [self loadOverlayFromKmlBundleFilename:@"KMLFor三国"];
     
 }
@@ -2173,15 +2173,8 @@ NSLog(@"--new-- %d, %@, %@", cnt,cluster.cluster.title, identifier);
     ATAppDelegate *appDelegate = (ATAppDelegate *)[[UIApplication sharedApplication] delegate];
     ATEventDataStruct* focusedEvent = appDelegate.focusedEvent;
     
-    if (overlaysToBeCleaned != nil)
-        [self.mapView removeOverlays:overlaysToBeCleaned];
     if (focusedEvent == nil)
         return;
-    
-    if (overlaysToBeCleaned == nil)
-        overlaysToBeCleaned = [[NSMutableArray alloc] init];
-    else
-        [overlaysToBeCleaned removeAllObjects];
     
     //first draw a circle on selected event
     CLLocationCoordinate2D workingCoordinate;
@@ -2198,17 +2191,48 @@ NSLog(@"--new-- %d, %@, %@", cnt,cluster.cluster.title, identifier);
     //following prepare mkPoi
     
     NSDictionary* overlaysDict = [self prepareOverlays:focusedEvent];
-    NSArray* kmlOverlays = [overlaysDict objectForKey:@"KML"];
+    NSMutableDictionary* kmlOverlays = [overlaysDict objectForKey:@"KML"];
     NSArray *nonkmlOverlays = [overlaysDict objectForKey:@"NONEKML"];
+    NSMutableDictionary* dictToBeCleanedNextTime = [[NSMutableDictionary alloc] init];
+    //Following logic is to not redraw overlay if the overlay has been draw in prev event
+    if (overlaysToBeCleaned != nil)
+    {
+        NSMutableArray* overlaysToBeCleanedArr = [overlaysToBeCleaned objectForKey:@"_nonkmlOverlayArrayKey_"];
+        [overlaysToBeCleaned removeObjectForKey:@"_nonkmlOverlayArrayKey_"];
+        if (overlaysToBeCleanedArr == nil)
+            overlaysToBeCleanedArr = [[NSMutableArray alloc] init];
+        
+        for (NSString* key in [kmlOverlays allKeys])
+        {
+            MKPolygon* alreadyExistedPoly = [overlaysToBeCleaned objectForKey:key];
+            if (alreadyExistedPoly != nil) //if already draw in previous event, then do not remove overlay from map, and do not draw again
+            {
+                [overlaysToBeCleaned removeObjectForKey:key];
+                [kmlOverlays removeObjectForKey:key];
+                [dictToBeCleanedNextTime setObject:alreadyExistedPoly forKey:key];
+            }
+            else
+            {
+                [overlaysToBeCleanedArr addObject:[kmlOverlays objectForKey:key]];
+            }
+        }
+        [overlaysToBeCleanedArr addObjectsFromArray:[overlaysToBeCleaned allValues]];
+        [overlaysToBeCleaned removeAllObjects];
+        [self.mapView removeOverlays:overlaysToBeCleanedArr];
+    }
+    else
+        overlaysToBeCleaned = [[NSMutableDictionary alloc] init];
     
-    //TODO ### have problem here for Reader
-    [overlaysToBeCleaned addObjectsFromArray:kmlOverlays];
-    [overlaysToBeCleaned addObjectsFromArray:nonkmlOverlays];
+    [overlaysToBeCleaned addEntriesFromDictionary:kmlOverlays];
+    [overlaysToBeCleaned addEntriesFromDictionary:dictToBeCleanedNextTime];
+    if (nonkmlOverlays != nil)
+        [overlaysToBeCleaned setObject:nonkmlOverlays forKey:@"_nonkmlOverlayArrayKey_"];
     
     
     // http://stackoverflow.com/questions/15061207/how-to-draw-a-straight-line-on-an-ios-map-without-moving-the-map-using-mkmapkit
     //add line by line, instead add all lines in one MKPolyline object, because I want to draw color differently in viewForOverlay
     [self.mapView addOverlays:nonkmlOverlays];
+    [self.mapView addOverlays:[kmlOverlays allValues]];
     [nonKmlOverlaySet addObjectsFromArray:nonkmlOverlays];
     /////[self.mapView addOverlays:kmlOverlays];
 }
@@ -2216,8 +2240,8 @@ NSLog(@"--new-- %d, %@, %@", cnt,cluster.cluster.title, identifier);
 - (NSDictionary*) prepareOverlays:(ATEventDataStruct*)ent
 {
     NSMutableDictionary* returnOverlaysDict = [[NSMutableDictionary alloc] init];
-    NSMutableArray* oldOverlays = [[NSMutableArray alloc] init];
-    NSMutableArray* kmlOverlaysLocal =  [[NSMutableArray alloc] init];
+    NSMutableArray* nonkmlOverlays = [[NSMutableArray alloc] init];
+    NSMutableDictionary* kmlOverlaysLocal =  [[NSMutableDictionary alloc] init];
     ATAppDelegate *appDelegate = (ATAppDelegate *)[[UIApplication sharedApplication] delegate];
     
     
@@ -2257,11 +2281,11 @@ NSLog(@"--new-- %d, %@, %@", cnt,cluster.cluster.title, identifier);
             for (MKPolygon* poly in thisOverlays)
             {
                 NSString* tt = poly.title; //this is name entered in google map
-                if (tt != nil)
-                    [whichKmlParserToRenderDict setObject:kp forKey:tt];
+                //title should never nil
+                [whichKmlParserToRenderDict setObject:kp forKey:tt];
+                [kmlOverlaysLocal setObject:poly forKey:tt];
             }
             [self.mapView addOverlays:thisOverlays];
-            [kmlOverlaysLocal addObjectsFromArray:thisOverlays];
         }
         else
         {
@@ -2298,11 +2322,11 @@ NSLog(@"--new-- %d, %@, %@", cnt,cluster.cluster.title, identifier);
             
             MKPolygon* polygon = [MKPolygon polygonWithCoordinates:overlayRegion2D count:[shareOverlayArray count]];
             free(overlayRegion2D);
-            [oldOverlays addObject:polygon];
+            [nonkmlOverlays addObject:polygon];
         }
     }
     [returnOverlaysDict setObject:kmlOverlaysLocal forKey:@"KML"];
-    [returnOverlaysDict setObject:oldOverlays forKey:@"NONEKML"];
+    [returnOverlaysDict setObject:nonkmlOverlays forKey:@"NONEKML"];
     return returnOverlaysDict;
 }
 

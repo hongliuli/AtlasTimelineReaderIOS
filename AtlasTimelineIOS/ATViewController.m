@@ -11,6 +11,7 @@
 #define ALERT_FOR_POPOVER_ERROR 2
 #define ALERT_FOR_PROMPT_LOAD_PHOTOS_FROM_WEB 3
 #define ALERT_FOR_SWITCH_APP_AFTER_LONG_PRESS 4
+#define ALWAYS_DISPLAYED_OVERLAY @"ALWAYS_DISPLAYED_OVERLAY_"
 
 #define AUTHOR_MODE_KEY @"AUTHOR_MODE_KEY"
 
@@ -154,6 +155,8 @@
     
     KMLParser* kmlParserForAlwaysDisplayedOverlay;
     NSMutableDictionary* whichKmlParserToRenderDict;
+    
+    CGPoint startingTouchLocation;
 }
 
 @synthesize mapView = _mapView;
@@ -268,8 +271,8 @@
     [self refreshEventListView:false];
     if (nonKmlOverlaySet == nil)
         nonKmlOverlaySet = [[NSMutableSet alloc] init];
-    if ([targetName hasPrefix:@"三国"])
-        [self loadOverlayFromKmlBundleFilename:@"KMLFor三国"];
+    //if ([targetName hasPrefix:@"三国"])
+        //[self loadOverlayFromKmlBundleFilename:@"KMLFor蜀道"];   ///@"KMLFor蜀道"];
     
 }
 -(void) viewDidAppear:(BOOL)animated
@@ -306,11 +309,16 @@
     NSURL *url = [NSURL fileURLWithPath:filePath];
     kmlParserForAlwaysDisplayedOverlay = [[KMLParser alloc] initWithURL:url];
   
-    //All <Placemark> name in KML must contains substr like "ALWAYS_DISPLAYED_OVERLAY_"
     [kmlParserForAlwaysDisplayedOverlay parseKML];
     
     // Add all of the MKOverlay objects parsed from the KML file to the map.
     NSArray *overlays = [kmlParserForAlwaysDisplayedOverlay overlays];
+    
+    for (MKPolygon* poly in overlays)
+    {
+        [poly setTitle:ALWAYS_DISPLAYED_OVERLAY]; //so render overlay knows to use kmlParserForAlwaysDisplayedOverlay KMLParser
+    }
+    
     [self.mapView addOverlays:overlays];
     
     // Add all of the MKAnnotation objects parsed from the KML file to the map.
@@ -1390,6 +1398,10 @@ NSLog(@"--new-- %d, %@, %@", cnt,cluster.cluster.title, identifier);
     currentTapTouchKey = 0;
     currentTapTouchMove = false;
     UITouch *touch = [touches anyObject];
+    
+    /// Set starting touch. this is for 3d touch enabled devices since 6s, see touchesMoved method below
+    startingTouchLocation = [touch locationInView:self.mapView];
+    
     NSNumber* annViewKey = [NSNumber numberWithLong:touch.view.tag];
     if ([annViewKey intValue] > 0) //tag is set in viewForAnnotation when instance tmpLbl
         currentTapTouchKey = [annViewKey intValue];
@@ -1398,6 +1410,9 @@ NSLog(@"--new-- %d, %@, %@", cnt,cluster.cluster.title, identifier);
 //Only tap to start event editor, when swipe map and happen to swipe on photo, do not start event editor
 - (void)touchesMoved:(NSSet *)touches withEvent:(UIEvent *)event{
     UITouch *touch = [touches anyObject];
+    CGPoint pt = [touch locationInView:self.mapView];
+    if (pt.x == startingTouchLocation.x && pt.y == startingTouchLocation.y)
+        return;
     NSNumber* annViewKey = [NSNumber numberWithLong:touch.view.tag];
     if ([annViewKey intValue] > 0 && [annViewKey intValue] == currentTapTouchKey)
         currentTapTouchMove = true;
@@ -2349,7 +2364,7 @@ NSLog(@"--new-- %d, %@, %@", cnt,cluster.cluster.title, identifier);
         MKPolygon* p = (MKPolygon*)overlay;
         NSString* tt = p.title; //entered in google map into kml, it is important to be used to identify kmlparser instance
 
-        if ([tt rangeOfString:@"ALWAYS_DISPLAYED_OVERLAY_"].location != NSNotFound)
+        if ([tt rangeOfString:ALWAYS_DISPLAYED_OVERLAY].location != NSNotFound)
             return [kmlParserForAlwaysDisplayedOverlay rendererForOverlay:overlay];
         else
         {

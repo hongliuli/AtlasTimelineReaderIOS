@@ -65,12 +65,23 @@ NSMutableArray* appStoreUrlList;
         return self;
     }
     
-    NSString* serviceUrl = [NSString stringWithFormat:@"http://www.chroniclemap.com//resources/newappshortlist.html"];
+    NSString* serviceUrl = [NSString stringWithFormat:@"http://www.chroniclemap.com/resources/newappshortlist.html"];
+    
+    NSUserDefaults* userDefault = [NSUserDefaults standardUserDefaults];
+    NSString* languageValue = [userDefault objectForKey:LanguageKey];
+    if (languageValue != nil)
+    {
+        if ([ChineseValue isEqualToString:languageValue])
+        {
+            serviceUrl = [NSString stringWithFormat:@"http://www.chroniclemap.com/resources/newappshortlist_zh.html"];
+        }
+    }
+    
     NSString* responseStr  = [ATHelper httpGetFromServer:serviceUrl :false];
     NSMutableArray* appNameList = [[NSMutableArray alloc] init];
     appStoreUrlList = [[NSMutableArray alloc] init];
     
-    if (responseStr != nil && [responseStr length] > 100)
+    if (responseStr != nil && [responseStr length] > 30)
     {
         NSArray* appList = [responseStr componentsSeparatedByString:@"\n"];
         for (NSString* appStr in appList)
@@ -84,8 +95,8 @@ NSMutableArray* appStoreUrlList;
             }
 
         }
-        [appNameList addObject:NSLocalizedString(@"More ...",nil)];
-        [appStoreUrlList addObject:NSLocalizedString(@"http://www.chroniclemap.com/resources/allapplist.html",nil)]; //TODO have chinese url
+        //[appNameList addObject:NSLocalizedString(@"More ...",nil)];
+        //[appStoreUrlList addObject:NSLocalizedString(@"http://www.chroniclemap.com/resources/allapplist.html",nil)]; //TODO have chinese url
     }
 
 
@@ -97,7 +108,6 @@ NSMutableArray* appStoreUrlList;
                             cancelButtonTitle:NSLocalizedString(@"Not Now",nil)
                             otherButtonTitles: nil];
         NSString* appName = [[NSBundle mainBundle] objectForInfoDictionaryKey:@"CFBundleDisplayName"];
-        NSLog(@" --- this app bunle name is %@", appName);
         for( NSString *title in appNameList)  {
             if (![appName isEqualToString:title])
                 [alert addButtonWithTitle:title];
@@ -109,24 +119,10 @@ NSMutableArray* appStoreUrlList;
 }
 -(void)alertView:(UIAlertView *)alertView clickedButtonAtIndex:(NSInteger)buttonIndex
 {
-    if (alertView.tag == ALERT_FOR_SWITCH_APP_AFTER_LONG_PRESS)
-    {
-        if (buttonIndex == 0) //Not Now
-            return; //user clicked cancel button
-        
-        if (![[UIApplication sharedApplication] openURL:[NSURL URLWithString:@"chroniclemap://"]]) //ChronicleMap app custom URL
-        {
-            NSString* chronicleMapAppUrl = @"https://itunes.apple.com/us/app/chronicle-map-event-based/id649653093?ls=1&mt=8";
-            [[UIApplication sharedApplication] openURL:[NSURL URLWithString:chronicleMapAppUrl]]; //download ChronicleMap from app store
-        }
-        return;
-    }
-    
     if (buttonIndex == 0) //Not Now
         return; //user clicked cancel button
     
     [[UIApplication sharedApplication] openURL:[NSURL URLWithString:appStoreUrlList[buttonIndex -1]]];
-
 }
 
 - (void) updateDateText

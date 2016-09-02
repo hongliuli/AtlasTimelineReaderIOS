@@ -88,7 +88,8 @@ UIView *descEditorContentView;
     UIBarButtonItem *fixedSpace = [[UIBarButtonItem alloc] initWithBarButtonSystemItem:UIBarButtonSystemItemFixedSpace target:nil action:nil];
     fixedSpace.width = 10;
     
-    NSArray *items = [NSArray arrayWithObjects: doneButton, fixedSpace, setShareButton, nil];
+    //NSArray *items = [NSArray arrayWithObjects: doneButton, fixedSpace, setShareButton, nil];
+    NSArray *items = [NSArray arrayWithObjects: doneButton, nil]; //for reader version share photo crash
     ATAppDelegate *appDelegate = (ATAppDelegate *)[[UIApplication sharedApplication] delegate];
     if (appDelegate.authorMode)
     {

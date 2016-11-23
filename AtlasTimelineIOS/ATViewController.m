@@ -271,8 +271,8 @@
     [self refreshEventListView:false];
     if (nonKmlOverlaySet == nil)
         nonKmlOverlaySet = [[NSMutableSet alloc] init];
-    //if ([targetName hasPrefix:@"三国"])
-        //[self loadOverlayFromKmlBundleFilename:@"KMLFor蜀道"];   ///@"KMLFor蜀道"];
+    if ([targetName hasPrefix:@"三国"])
+        [self loadOverlayFromKmlBundleFilename:@"KMLFor蜀道"];   ///@"KMLFor蜀道"];
     
 }
 -(void) viewDidAppear:(BOOL)animated

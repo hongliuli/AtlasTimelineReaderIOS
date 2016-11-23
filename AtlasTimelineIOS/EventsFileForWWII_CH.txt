@@ -73,6 +73,11 @@ http://baike.baidu.com/view/34028.htm?fr=aladdin
  
  
 [Overlay]Manchuria
+
+[Overlay]
+39.360552,112.331241
+40.728862,113.407319
+40.961647,118.842863
  
 [Date]1932-01-28
 [Tags]上海 四川路

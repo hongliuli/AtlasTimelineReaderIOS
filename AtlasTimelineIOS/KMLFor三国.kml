@@ -11,6 +11,20 @@
 <heading>0.0</heading>
 <altitudeMode>clampToGround</altitudeMode>
 </LookAt>
+<Placemark>
+    <name>汉中</name>
+    <styleUrl>#icon-1037-nodesc</styleUrl>
+    <Point>
+        <coordinates>107.0229721069336,33.07284324874736,0.0</coordinates>
+    </Point>
+</Placemark>
+<Placemark>
+    <name>阳县</name>
+    <styleUrl>#icon-1037-nodesc</styleUrl>
+    <Point>
+        <coordinates>107.53872871398926,33.221241228838714,0.0</coordinates>
+    </Point>
+</Placemark>
 <Placemark id="three_kingdoms_262ce_h4h.1">
 <name>ALWAYS_DISPLAYED_OVERLAY__Wei</name>
 <description><![CDATA[<h4>three_kingdoms_262ce_h4h</h4>

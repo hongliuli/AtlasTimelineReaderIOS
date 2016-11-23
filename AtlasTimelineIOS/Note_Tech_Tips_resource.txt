@@ -1,3 +1,25 @@
+
+For AtlasTimelineRader, now have to open project with *.xworkspace
+
+
+kml trick:
+----------
+- KMLParser does not know <StyleMap> while google map generate KML with it, so for google map generated KML, need following changes:
+    1. remove all <StyleMap>...</StyleMap> section
+    2. Remove all <Style> with id xxxx-highlighted
+    3. for all style with id ...-normal, remove "-normal" from the id value
+    4. sometimes something with <description><![CDATA[沿巴河，渠江，在合川]]></description> will not display. but when remove some chinese chars, it works. so better remove CDATA[[] or remove whole description section
+- eacy polygon/polyline's name is important when generate in google map, it is used to decide which KMLParser instance to use,
+  make sure use different name for each polygon/poyline for all KMLs in one Event Desc text. Or best to have unique name across all events because it may be sahred across event
+
+Pods Trick
+-----------
+After I reinstalled OSX, I lost googlemobileads.framework (new framework under firebase does not work. To find old version, I have to use pods. )
+- How to use CocoaPod (I used it for GoogleMobileAds.framework):
+    http://blogs.triffort.com/?p=309
+  After open project using xxx.xworkspace, select auto-generated "Pods-xxxxx" from schema dropdown and build. Otheriwse will get following error:
+        "ld: library not found for -lPods-xxxxx"
+
 - How to new a target:  http://samwize.com/2014/05/22/create-multiple-targets-slash-apps-for-1-xcode-project/
 - How to create schemas when have multiple target:
   . create schema for each target so we can pick which target to run or to distribute
